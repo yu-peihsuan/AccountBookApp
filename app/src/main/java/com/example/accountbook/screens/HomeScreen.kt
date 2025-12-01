@@ -29,7 +29,7 @@ import com.example.accountbook.viewmodel.StringResources
 import java.util.Calendar
 
 val TopBarColor = Color(0xFFFCF5E8)
-val AppBgColor = Color(0xFFFEFDFD)
+val AppBgColor = Color(0xFFFDFBF7)
 val CardBorderColor = Color(0xFFEBEBEB)
 val CardYellow = Color(0xFFEDD86D)
 val CardBlue = Color(0xFF7CB9E8)
@@ -305,7 +305,7 @@ fun BudgetCard(percent:Int, budget:Int, remain:Int, currency: String, strings: S
                         style = Stroke(width = 25f)
                     )
                     drawArc(
-                        color = Color(0xFFA5D6A7),
+                        color = Color(0xFF7EC366),
                         startAngle = -90f,
                         sweepAngle = percent * 3.6f,
                         useCenter = false,
@@ -326,7 +326,7 @@ fun BudgetCard(percent:Int, budget:Int, remain:Int, currency: String, strings: S
                     Spacer(Modifier.width(24.dp))
                     Box(
                         Modifier
-                            .background(Color(0xFFA5D6A7), RoundedCornerShape(50))
+                            .background(Color(0xFF7EC366), RoundedCornerShape(50))
                             .padding(horizontal = 10.dp, vertical = 2.dp)
                     ) {
                         Text("$currency${remain}", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
