@@ -11,13 +11,11 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
 
     companion object {
         private const val DB_NAME = "accountbook_db"
-        // ★ 修改：版本號升級為 3 (因為修改了資料表結構)
-        private const val DB_VERSION = 3
+        private const val DB_VERSION = 3 // 維持版本 3
 
         // --- 交易資料表 ---
         private const val TABLE_NAME = "transactions"
         private const val ID_COL = "id"
-        // ★ 新增：使用者 ID 欄位 (Foreign Key 概念)
         private const val TR_USER_ID_COL = "user_id"
         private const val DATE_COL = "date"
         private const val DAY_COL = "day"
@@ -35,10 +33,9 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        // ★ 修改：建立交易表時，加入 user_id 欄位
         val queryTransaction = ("CREATE TABLE " + TABLE_NAME + " ("
                 + ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + TR_USER_ID_COL + " INTEGER,"  // 儲存這筆交易屬於誰
+                + TR_USER_ID_COL + " INTEGER,"
                 + DATE_COL + " TEXT,"
                 + DAY_COL + " TEXT,"
                 + TITLE_COL + " TEXT,"
@@ -47,7 +44,6 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
                 + CATEGORY_KEY_COL + " TEXT)")
         db.execSQL(queryTransaction)
 
-        // 建立使用者表 (保持不變)
         val queryUsers = ("CREATE TABLE " + TABLE_USERS + " ("
                 + USER_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + USER_NAME_COL + " TEXT,"
@@ -57,15 +53,12 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // 簡單處理：升級時刪除舊表重建 (注意：這會清空舊資料)
         db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
         onCreate(db)
     }
 
-    // ---------------- 使用者相關功能 ----------------
-
-    // 檢查使用者名稱是否已存在
+    // ---------------- 使用者功能 ----------------
     fun checkUserExists(name: String): Boolean {
         val db = this.readableDatabase
         val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE $USER_NAME_COL = ?", arrayOf(name))
@@ -74,7 +67,6 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return exists
     }
 
-    // ★ 新增：檢查 Email 是否已存在
     fun checkEmailExists(email: String): Boolean {
         val db = this.readableDatabase
         val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE $USER_EMAIL_COL = ?", arrayOf(email))
@@ -83,31 +75,25 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return exists
     }
 
-    // ★ 修改：註冊新使用者 (回傳新生成的 ID)
     fun addUser(name: String, email: String, pass: String): Long {
         val db = this.writableDatabase
         val values = ContentValues()
         values.put(USER_NAME_COL, name)
         values.put(USER_EMAIL_COL, email)
         values.put(USER_PASS_COL, pass)
-
-        // insert 會回傳新資料的 row ID
         val newId = db.insert(TABLE_USERS, null, values)
         db.close()
         return newId
     }
 
-    // ★ 修改：登入驗證 (回傳 ID 和 Name 的 Pair，失敗回傳 null)
     fun validateUser(email: String, pass: String): Pair<Int, String>? {
         val db = this.readableDatabase
         val cursor = db.rawQuery(
             "SELECT * FROM $TABLE_USERS WHERE $USER_EMAIL_COL = ? AND $USER_PASS_COL = ?",
             arrayOf(email, pass)
         )
-
         var userInfo: Pair<Int, String>? = null
         if (cursor.moveToFirst()) {
-            // index 0: id, index 1: name
             val id = cursor.getInt(0)
             val name = cursor.getString(1)
             userInfo = Pair(id, name)
@@ -116,21 +102,12 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return userInfo
     }
 
-    // ---------------- 交易相關功能 (加上 User ID 過濾) ----------------
+    // ---------------- 交易功能 ----------------
 
-    // ★ 修改：新增交易時，必須傳入 userId
-    fun addTransaction(
-        userId: Int,
-        date: String,
-        day: String,
-        title: String,
-        amount: Int,
-        type: String,
-        categoryKey: String
-    ) {
+    fun addTransaction(userId: Int, date: String, day: String, title: String, amount: Int, type: String, categoryKey: String) {
         val db = this.writableDatabase
         val values = ContentValues()
-        values.put(TR_USER_ID_COL, userId) // 寫入擁有者 ID
+        values.put(TR_USER_ID_COL, userId)
         values.put(DATE_COL, date)
         values.put(DAY_COL, day)
         values.put(TITLE_COL, title)
@@ -141,21 +118,15 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         db.close()
     }
 
-    // ★ 修改：讀取交易時，必須傳入 userId 來篩選
     fun getAllTransactions(userId: Int): ArrayList<Transaction> {
         val db = this.readableDatabase
         val list = ArrayList<Transaction>()
-
-        // 只選取該 userId 的資料
         val cursor: Cursor = db.rawQuery(
             "SELECT * FROM $TABLE_NAME WHERE $TR_USER_ID_COL = ? ORDER BY $ID_COL DESC",
             arrayOf(userId.toString())
         )
-
         if (cursor.moveToFirst()) {
             do {
-                // 注意 index 變化：
-                // 0: id, 1: user_id, 2: date, 3: day, 4: title, 5: amount, 6: type, 7: category_key
                 list.add(
                     Transaction(
                         id = cursor.getLong(0),
@@ -173,16 +144,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return list
     }
 
-    // 修改交易 (維持原樣，根據 Transaction ID 修改即可)
-    fun updateTransaction(
-        id: Long,
-        date: String,
-        day: String,
-        title: String,
-        amount: Int,
-        type: String,
-        categoryKey: String
-    ) {
+    fun updateTransaction(id: Long, date: String, day: String, title: String, amount: Int, type: String, categoryKey: String) {
         val db = this.writableDatabase
         val values = ContentValues()
         values.put(DATE_COL, date)
@@ -195,20 +157,17 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         db.close()
     }
 
-    // 刪除交易 (維持原樣)
     fun deleteTransaction(id: Long) {
         val db = this.writableDatabase
         db.delete(TABLE_NAME, "$ID_COL=?", arrayOf(id.toString()))
         db.close()
     }
 
-    // 取得單筆資料 (維持原樣)
     fun getTransactionById(id: Long): Transaction? {
         val db = this.readableDatabase
         val cursor = db.rawQuery("SELECT * FROM $TABLE_NAME WHERE $ID_COL=?", arrayOf(id.toString()))
         var transaction: Transaction? = null
         if (cursor.moveToFirst()) {
-            // 記得 index 對應
             transaction = Transaction(
                 id = cursor.getLong(0),
                 date = cursor.getString(2),
@@ -221,5 +180,53 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         }
         cursor.close()
         return transaction
+    }
+
+    // ★ 新增：取得分類統計資料 (給圓餅圖用) - 只統計支出
+    fun getCategoryTotals(userId: Int): Map<String, Int> {
+        val db = this.readableDatabase
+        val map = HashMap<String, Int>()
+
+        // 篩選「支出」或「Expense」
+        val cursor = db.rawQuery(
+            "SELECT $CATEGORY_KEY_COL, SUM($AMOUNT_COL) FROM $TABLE_NAME " +
+                    "WHERE $TR_USER_ID_COL = ? AND ($TYPE_COL = '支出' OR $TYPE_COL = 'Expense') " +
+                    "GROUP BY $CATEGORY_KEY_COL",
+            arrayOf(userId.toString())
+        )
+
+        if (cursor.moveToFirst()) {
+            do {
+                val cat = cursor.getString(0) ?: "other"
+                val sum = cursor.getInt(1)
+                map[cat] = sum
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return map
+    }
+
+    // ★ 新增：取得每日支出統計 (給長條圖用，取最近 7 天有資料的)
+    fun getRecentDailyTotals(userId: Int): List<Pair<String, Int>> {
+        val db = this.readableDatabase
+        val list = ArrayList<Pair<String, Int>>()
+
+        val cursor = db.rawQuery(
+            "SELECT $DATE_COL, SUM($AMOUNT_COL) FROM $TABLE_NAME " +
+                    "WHERE $TR_USER_ID_COL = ? AND ($TYPE_COL = '支出' OR $TYPE_COL = 'Expense') " +
+                    "GROUP BY $DATE_COL ORDER BY $DATE_COL DESC LIMIT 7",
+            arrayOf(userId.toString())
+        )
+
+        if (cursor.moveToFirst()) {
+            do {
+                val date = cursor.getString(0)
+                val sum = cursor.getInt(1)
+                list.add(Pair(date, sum))
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        // 因為是 DESC 抓出來 (最新的在前)，所以反轉讓圖表從左(舊)到右(新)
+        return list.reversed()
     }
 }
