@@ -7,18 +7,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.AndroidViewModel
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
+import com.example.accountbook.data.DBHandler
 import java.io.Serializable
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-// ---------------- 多語系資源定義 ----------------
-
+// ---------------- 多語系資源定義 (保持原樣) ----------------
 interface StringResources {
-    // 登入頁
     val loginTitle: String
     val registerTitle: String
     val fieldName: String
@@ -30,23 +26,17 @@ interface StringResources {
     val switchLogin: String
     val errorEmptyField: String
     val errorLoginFailed: String
-
-    // 首頁
     val tabExpense: String
     val tabIncome: String
     val balance: String
     val budget: String
     val remain: String
     val historyTitle: String
-
-    // 側邊欄
     val menuHome: String
     val menuAdd: String
     val menuChart: String
     val menuSetting: String
     val menuLogout: String
-
-    // 記帳頁
     val inputNote: String
     val btnDone: String
     val btnConfirm: String
@@ -63,8 +53,6 @@ interface StringResources {
     val categoryBills: String
     val categoryOther: String
     val categoryAdd: String
-
-    // 設定頁
     val settingTitle: String
     val sectionAccount: String
     val labelAccount: String
@@ -77,18 +65,13 @@ interface StringResources {
     val labelHelp: String
     val optionTraditionalChinese: String
     val optionEnglish: String
-
-    // 圖表頁
     val chartTitle: String
     val chartPie: String
     val chartBar: String
-
-    // 日期格式
     val dateFormat: String
     val dayFormat: String
 }
 
-// 中文實作
 object StringsZH : StringResources {
     override val loginTitle = "登入"
     override val registerTitle = "註冊帳號"
@@ -101,20 +84,17 @@ object StringsZH : StringResources {
     override val switchLogin = "已有帳號？點此登入"
     override val errorEmptyField = "欄位不能為空"
     override val errorLoginFailed = "登入失敗，請檢查帳號密碼"
-
     override val tabExpense = "支出"
     override val tabIncome = "收入"
     override val balance = "結餘"
     override val budget = "預算"
     override val remain = "剩餘"
     override val historyTitle = "交易紀錄"
-
     override val menuHome = "交易紀錄"
     override val menuAdd = "記帳本"
     override val menuChart = "圖表分析"
     override val menuSetting = "功能設定"
     override val menuLogout = "登出"
-
     override val inputNote = "輸入備註"
     override val btnDone = "完成"
     override val btnConfirm = "確定"
@@ -131,7 +111,6 @@ object StringsZH : StringResources {
     override val categoryBills = "生活繳費"
     override val categoryOther = "其他"
     override val categoryAdd = "新增分類"
-
     override val settingTitle = "設定"
     override val sectionAccount = "帳號管理"
     override val labelAccount = "登入帳號"
@@ -144,16 +123,13 @@ object StringsZH : StringResources {
     override val labelHelp = "使用說明"
     override val optionTraditionalChinese = "中文(繁體)"
     override val optionEnglish = "English"
-
     override val chartTitle = "圖表分析"
     override val chartPie = "📈 圓餅圖 (之後串資料)"
     override val chartBar = "📊 長條圖 (之後串資料)"
-
     override val dateFormat = "yyyy/MM/dd"
     override val dayFormat = "EEEE"
 }
 
-// 英文實作
 object StringsEN : StringResources {
     override val loginTitle = "Login"
     override val registerTitle = "Register"
@@ -166,20 +142,17 @@ object StringsEN : StringResources {
     override val switchLogin = "Have an account? Login here"
     override val errorEmptyField = "Fields cannot be empty"
     override val errorLoginFailed = "Login failed, check credentials"
-
     override val tabExpense = "Expense"
     override val tabIncome = "Income"
     override val balance = "Balance"
     override val budget = "Budget"
     override val remain = "Remain"
     override val historyTitle = "History"
-
     override val menuHome = "History"
     override val menuAdd = "Add Record"
     override val menuChart = "Analysis"
     override val menuSetting = "Settings"
     override val menuLogout = "Logout"
-
     override val inputNote = "Add a note"
     override val btnDone = "Done"
     override val btnConfirm = "OK"
@@ -196,7 +169,6 @@ object StringsEN : StringResources {
     override val categoryBills = "Bills"
     override val categoryOther = "Other"
     override val categoryAdd = "Add"
-
     override val settingTitle = "Settings"
     override val sectionAccount = "Account"
     override val labelAccount = "Email"
@@ -209,11 +181,9 @@ object StringsEN : StringResources {
     override val labelHelp = "Help"
     override val optionTraditionalChinese = "Traditional Chinese"
     override val optionEnglish = "English"
-
     override val chartTitle = "Analysis"
     override val chartPie = "📈 Pie Chart (Coming soon)"
     override val chartBar = "📊 Bar Chart (Coming soon)"
-
     override val dateFormat = "MM/dd/yyyy"
     override val dayFormat = "EEEE"
 }
@@ -221,22 +191,21 @@ object StringsEN : StringResources {
 // ---------------- ViewModel ----------------
 
 data class Transaction(
-    val id: Long = System.currentTimeMillis(),
+    val id: Long = 0,
     val date: String,
     val day: String,
     val title: String,
     val amount: Int,
     val type: String,
-    val categoryKey: String = "" // 用來儲存分類的代碼 (例如 "breakfast")
+    val categoryKey: String = ""
 ) : Serializable
 
 class TransactionViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
-    private val fileName = "account_book.data"
+    private val dbHandler = DBHandler(context)
     private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
-    // --- 狀態 ---
     var budget by mutableIntStateOf(8000)
         private set
     var currency by mutableStateOf("NT$")
@@ -263,7 +232,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         checkLoginStatus()
     }
 
-    // ★ 新增：根據 Key 取得當前語言的分類名稱
     fun getCategoryName(key: String): String {
         val s = currentStrings
         return when (key) {
@@ -279,7 +247,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             "bills" -> s.categoryBills
             "other" -> s.categoryOther
             "add" -> s.categoryAdd
-            else -> "" // 若不是內建分類 (例如舊資料或自訂)，回傳空字串
+            else -> ""
         }
     }
 
@@ -345,7 +313,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         prefs.edit().putString("app_language", newLang).apply()
     }
 
-    // ★ 修改：新增 categoryKey 參數
+    // 新增資料
     fun addTransaction(title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
         val formatD = SimpleDateFormat(currentStrings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
         val formatW = SimpleDateFormat(currentStrings.dayFormat, if(language=="English") Locale.US else Locale.TAIWAN)
@@ -353,16 +321,31 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         val dateStr = formatD.format(dateMillis)
         val dayStr = formatW.format(dateMillis)
 
-        val newTx = Transaction(
-            date = dateStr,
-            day = dayStr,
-            title = title,
-            amount = amount,
-            type = type,
-            categoryKey = categoryKey // 儲存 Key
-        )
-        _transactions.add(0, newTx)
-        saveData()
+        dbHandler.addTransaction(dateStr, dayStr, title, amount, type, categoryKey)
+        loadData()
+    }
+
+    // 更新資料
+    fun updateTransaction(id: Long, title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
+        val formatD = SimpleDateFormat(currentStrings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
+        val formatW = SimpleDateFormat(currentStrings.dayFormat, if(language=="English") Locale.US else Locale.TAIWAN)
+
+        val dateStr = formatD.format(dateMillis)
+        val dayStr = formatW.format(dateMillis)
+
+        dbHandler.updateTransaction(id, dateStr, dayStr, title, amount, type, categoryKey)
+        loadData()
+    }
+
+    // 刪除資料
+    fun deleteTransaction(id: Long) {
+        dbHandler.deleteTransaction(id)
+        loadData()
+    }
+
+    // 取得單筆資料 (for 編輯畫面)
+    fun getTransactionById(id: Long): Transaction? {
+        return dbHandler.getTransactionById(id)
     }
 
     private fun isExpense(type: String): Boolean = type == "支出" || type == "Expense"
@@ -379,31 +362,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         return if (budget > 0) ((r.toFloat() / budget) * 100).toInt() else 0
     }
 
-    private fun saveData() {
-        try {
-            val listToSave = ArrayList(_transactions)
-            val fos = context.openFileOutput(fileName, Context.MODE_PRIVATE)
-            val os = ObjectOutputStream(fos)
-            os.writeObject(listToSave)
-            os.close()
-            fos.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     private fun loadData() {
-        try {
-            val fis = context.openFileInput(fileName)
-            val `is` = ObjectInputStream(fis)
-            val savedList = `is`.readObject() as List<Transaction>
-            _transactions.clear()
-            _transactions.addAll(savedList)
-            `is`.close()
-            fis.close()
-        } catch (e: Exception) {
-            // Empty
-        }
+        val list = dbHandler.getAllTransactions()
+        _transactions.clear()
+        _transactions.addAll(list)
     }
 
     private fun loadSettings() {

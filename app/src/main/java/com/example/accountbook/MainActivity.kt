@@ -6,9 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.accountbook.screens.*
 import com.example.accountbook.viewmodel.TransactionViewModel
 import kotlinx.coroutines.launch
@@ -30,30 +32,23 @@ fun AccountBookApp() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // 判斷起始頁面：若已登入則到 Home，否則到 Login
     val startDest = if (vm.isLoggedIn) "home" else "login"
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        // Drawer 也要多語系，所以傳入 vm
         drawerContent = {
-            if (vm.isLoggedIn) { // 只有登入後才顯示 Drawer 內容
+            if (vm.isLoggedIn) {
                 ModalDrawerSheet {
                     DrawerMenu(
                         vm = vm,
                         onSelect = { route ->
-                            // 1. 先關閉側邊欄
                             scope.launch { drawerState.close() }
-
-                            // ★ 修改：攔截 "logout" 指令
                             if (route == "logout") {
-                                vm.logout() // 執行 ViewModel 登出
+                                vm.logout()
                                 navController.navigate("login") {
-                                    // 清除 Back Stack，防止按返回鍵回到 App 內部
                                     popUpTo(0) { inclusive = true }
                                 }
                             } else {
-                                // 2. 其他正常頁面跳轉
                                 navController.navigate(route) {
                                     popUpTo("home") { saveState = true }
                                     launchSingleTop = true
@@ -68,12 +63,10 @@ fun AccountBookApp() {
     ) {
         NavHost(navController = navController, startDestination = startDest) {
 
-            // ★ 1. 登入頁
             composable("login") {
                 LoginScreen(
                     vm = vm,
                     onLoginSuccess = {
-                        // 登入成功，跳轉首頁，並清空 back stack 防止按返回鍵回到登入頁
                         navController.navigate("home") {
                             popUpTo("login") { inclusive = true }
                         }
@@ -81,7 +74,6 @@ fun AccountBookApp() {
                 )
             }
 
-            // ★ 2. 首頁
             composable("home") {
                 HomeScreen(
                     vm = vm,
@@ -90,23 +82,26 @@ fun AccountBookApp() {
                 )
             }
 
-            // ★ 3. 記帳頁
-            composable("add") {
+            // 修改：支援接收選用的 id 參數，預設為 -1 (新增模式)
+            composable(
+                route = "add?id={id}",
+                arguments = listOf(navArgument("id") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                })
+            ) { backStackEntry ->
+                val id = backStackEntry.arguments?.getLong("id") ?: -1L
                 AddTransactionScreen(
                     vm = vm,
-                    onBack = { navController.popBackStack() },
-                    onAdd = { title, amount, type, date, categoryKey ->
-                        vm.addTransaction(title, amount, type, date, categoryKey)
-                    }
+                    transactionId = id,
+                    onBack = { navController.popBackStack() }
                 )
             }
 
-            // ★ 4. 圖表頁
             composable("chart") {
                 ChartScreen(vm = vm, onBack = { navController.popBackStack() })
             }
 
-            // ★ 5. 設定頁
             composable("setting") {
                 SettingScreen(
                     vm = vm,

@@ -38,29 +38,50 @@ val BorderColor = Color(0xFFE0Ddd5)
 val PinkButtonColor = Color(0xFFEBC4C4)
 val TextColor = Color(0xFF4A463F)
 
-// ★ 修改：加入 key 屬性
 data class CategoryItem(val name: String, val icon: ImageVector, val key: String)
 
 @Composable
 fun AddTransactionScreen(
     vm: TransactionViewModel,
-    onBack: () -> Unit,
-    // ★ 修改：onAdd 參數增加 categoryKey
-    onAdd: (String, Int, String, Long, String) -> Unit
+    transactionId: Long, // 接收傳入的 ID
+    onBack: () -> Unit
 ) {
     val strings = vm.currentStrings
     val currency = vm.currency
     val language = vm.language
 
+    // 判斷是否為編輯模式
+    val isEditMode = transactionId != -1L
+
     var type by remember { mutableStateOf(if(language=="English") "Expense" else "支出") }
-
-    // ★ 修改：改為記錄選中的 Key (預設 rent)
     var selectedCategoryKey by remember { mutableStateOf("rent") }
-
     var amount by remember { mutableStateOf("0") }
     var note by remember { mutableStateOf("") }
     var dateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    // 初始化載入資料 (如果是編輯模式)
+    LaunchedEffect(transactionId) {
+        if (isEditMode) {
+            val tx = vm.getTransactionById(transactionId)
+            if (tx != null) {
+                type = tx.type
+                selectedCategoryKey = tx.categoryKey
+                amount = tx.amount.toString()
+                note = tx.title
+
+                try {
+                    val format = SimpleDateFormat(strings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
+                    val dateObj = format.parse(tx.date)
+                    if (dateObj != null) {
+                        dateMillis = dateObj.time
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
 
     fun formatDate(millis: Long): String {
         val format = SimpleDateFormat("${strings.dateFormat} ${strings.dayFormat}",
@@ -75,7 +96,6 @@ fun AddTransactionScreen(
         dateMillis = calendar.timeInMillis
     }
 
-    // ★ 修改：定義分類時加入 Key
     val categories = listOf(
         CategoryItem(strings.categoryBreakfast, Icons.Filled.Star, "breakfast"),
         CategoryItem(strings.categoryLunch, Icons.Filled.Face, "lunch"),
@@ -129,6 +149,19 @@ fun AddTransactionScreen(
                 Box(Modifier.align(Alignment.Center)) {
                     TypeSegmentedControl(type, strings) { type = it }
                 }
+
+                // 如果是編輯模式，顯示刪除按鈕
+                if (isEditMode) {
+                    IconButton(
+                        onClick = {
+                            vm.deleteTransaction(transactionId)
+                            onBack()
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    ) {
+                        Icon(Icons.Default.Delete, null, tint = Color(0xFFE57373))
+                    }
+                }
             }
         }
     ) { pad ->
@@ -148,7 +181,7 @@ fun AddTransactionScreen(
                 items(categories) { item ->
                     CategoryCell(
                         item = item,
-                        isSelected = selectedCategoryKey == item.key, // 比對 Key
+                        isSelected = selectedCategoryKey == item.key,
                         onClick = { selectedCategoryKey = item.key }
                     )
                 }
@@ -223,11 +256,17 @@ fun AddTransactionScreen(
                 onInput = { amount = it },
                 onDone = onBack,
                 note = note,
-                selectedCategoryKey = selectedCategoryKey, // 傳遞 Key
-                type = type,
-                dateMillis = dateMillis,
-                onAdd = onAdd,
-                btnDoneText = strings.btnDone
+                handleAction = { finalAmount ->
+                    val title = if (note.isNotEmpty()) note else ""
+
+                    if (isEditMode) {
+                        vm.updateTransaction(transactionId, title, finalAmount, type, dateMillis, selectedCategoryKey)
+                    } else {
+                        vm.addTransaction(title, finalAmount, type, dateMillis, selectedCategoryKey)
+                    }
+                    onBack()
+                },
+                btnDoneText = if (isEditMode) strings.btnConfirm else strings.btnDone
             )
         }
     }
@@ -301,10 +340,7 @@ fun CalculatorSection(
     onInput: (String) -> Unit,
     onDone: () -> Unit,
     note: String,
-    selectedCategoryKey: String,
-    type: String,
-    dateMillis: Long,
-    onAdd: (String, Int, String, Long, String) -> Unit,
+    handleAction: (Int) -> Unit,
     btnDoneText: String
 ) {
     val btnShape = RoundedCornerShape(10.dp)
@@ -354,21 +390,17 @@ fun CalculatorSection(
         }
     }
 
-    fun handleDone() {
+    fun handleDoneClick() {
         if (amount.any { it in "+-x/" && it != amount.first() }) {
             val result = calculateExpression(amount)
             onInput(result)
         } else {
             val finalAmount = amount.toIntOrNull() ?: 0
             if (finalAmount > 0) {
-                // ★ 關鍵邏輯：
-                // 如果有備註，title = note。
-                // 如果沒備註，title = "" (空字串)，並傳送 selectedCategoryKey。
-                // 這樣 HomeScreen 就可以知道：空字串 -> 用 Key 翻譯顯示；非空 -> 顯示使用者自訂文字。
-                val title = if (note.isNotEmpty()) note else ""
-                onAdd(title, finalAmount, type, dateMillis, selectedCategoryKey)
+                handleAction(finalAmount)
+            } else {
+                onDone()
             }
-            onDone()
         }
     }
 
@@ -437,7 +469,7 @@ fun CalculatorSection(
                     .fillMaxHeight()
                     .clip(btnShape)
                     .background(PinkButtonColor)
-                    .clickable { handleDone() },
+                    .clickable { handleDoneClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Text(

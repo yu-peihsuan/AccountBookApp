@@ -123,7 +123,7 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { nav.navigate("add") },
+                onClick = { nav.navigate("add") }, // 新增時不帶 ID，預設為 -1
                 containerColor = Color(0xFFF2EAD5),
                 shape = RoundedCornerShape(50),
                 modifier = Modifier.size(width = 110.dp, height = 48.dp)
@@ -180,7 +180,18 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
             }
 
             items(list) { (date, transactions, dayTotal) ->
-                DayRecord(date, transactions, dayTotal, currency, strings, vm) // 傳入 vm
+                DayRecord(
+                    date,
+                    transactions,
+                    dayTotal,
+                    currency,
+                    strings,
+                    vm,
+                    onItemClick = { tx ->
+                        // 點擊項目時，導航至編輯頁面並帶上該筆資料的 ID
+                        nav.navigate("add?id=${tx.id}")
+                    }
+                )
             }
 
             item { Spacer(Modifier.height(60.dp)) }
@@ -212,7 +223,8 @@ fun DayRecord(
     dayTotal: Int,
     currency: String,
     strings: StringResources,
-    vm: TransactionViewModel // 需使用 VM 進行翻譯
+    vm: TransactionViewModel,
+    onItemClick: (Transaction) -> Unit // 新增點擊 callback
 ) {
     Box(
         Modifier
@@ -239,18 +251,17 @@ fun DayRecord(
 
             transactions.forEachIndexed { index, tx ->
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onItemClick(tx) } // 加入點擊觸發
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 圖示邏輯：優先看 Key，其次看標題
                     val iconKey = if (tx.categoryKey.isNotEmpty()) tx.categoryKey else tx.title
                     Icon(getIconByKey(iconKey), null, tint = TextGray, modifier = Modifier.size(24.dp))
 
                     Spacer(Modifier.width(16.dp))
 
-                    // ★ 關鍵翻譯邏輯：
-                    // 若 title 是空字串 (表示無備註)，則用 categoryKey 去查翻譯 (getCategoryName)
-                    // 若 title 不為空 (表示有備註)，則顯示 title
                     val displayText = if (tx.title.isNotEmpty()) tx.title else vm.getCategoryName(tx.categoryKey)
 
                     Text(displayText, fontSize = 20.sp, color = TextGray, modifier = Modifier.weight(1f))
@@ -272,7 +283,6 @@ fun DayRecord(
 }
 
 fun getIconByKey(key: String): ImageVector {
-    // 簡單對應，同時支援 key 和舊的中文 fallback
     return when {
         key.contains("traffic") || key.contains("交通") -> Icons.Default.Place
         key.contains("lunch") || key.contains("dinner") || key.contains("breakfast") || key.contains("食") -> Icons.Default.Star
