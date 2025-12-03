@@ -50,9 +50,9 @@ fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
 
                 Column {
                     Text(vm.userName.ifEmpty { "U11216004" },
-                        fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF4A463F))
+                        fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF4A463F))
                     Text(vm.userEmail.ifEmpty { "帳號資訊" },
-                        fontSize = 14.sp, color = Color.Gray)
+                        fontSize = 20.sp, color = Color.Gray)
                 }
             }
 
