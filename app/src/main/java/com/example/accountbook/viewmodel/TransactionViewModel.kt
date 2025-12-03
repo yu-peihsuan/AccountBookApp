@@ -213,11 +213,16 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var language by mutableStateOf("中文(繁體)")
         private set
 
+    // 使用者狀態
     var userName by mutableStateOf("")
         private set
     var userEmail by mutableStateOf("")
         private set
     var isLoggedIn by mutableStateOf(false)
+        private set
+
+    // ★ 新增：目前使用者的 ID (預設 -1 代表未登入)
+    var currentUserId by mutableIntStateOf(-1)
         private set
 
     val currentStrings: StringResources
@@ -228,8 +233,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     init {
         loadSettings()
-        loadData()
-        checkLoginStatus()
+        checkLoginStatus() // 先檢查登入狀態，這會設定 currentUserId
+        loadData()         // 再根據 ID 載入資料
     }
 
     fun getCategoryName(key: String): String {
@@ -251,28 +256,67 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun register(name: String, email: String, pass: String) {
-        prefs.edit()
-            .putString("user_name", name)
-            .putString("user_email", email)
-            .putString("user_pass", pass)
-            .putBoolean("is_logged_in", true)
-            .apply()
+    // ★ 修改：註冊邏輯
+    fun register(name: String, email: String, pass: String): String {
+        // 1. 檢查使用者名稱重複
+        if (dbHandler.checkUserExists(name)) {
+            return "使用者名稱已存在"
+        }
+        // 2. ★ 新增：檢查 Email 重複
+        if (dbHandler.checkEmailExists(email)) {
+            return "此 Email 已被註冊"
+        }
 
-        userName = name
-        userEmail = email
-        isLoggedIn = true
+        // 3. 寫入資料庫，並取得新 ID
+        val newUserId = dbHandler.addUser(name, email, pass)
+
+        if (newUserId != -1L) {
+            // 4. 註冊成功，自動登入並儲存狀態
+            prefs.edit()
+                .putInt("user_id", newUserId.toInt()) // 儲存 ID
+                .putString("user_name", name)
+                .putString("user_email", email)
+                .putBoolean("is_logged_in", true)
+                .apply()
+
+            currentUserId = newUserId.toInt()
+            userName = name
+            userEmail = email
+            isLoggedIn = true
+
+            // 清空舊資料 (因為剛註冊，一定是空的)
+            _transactions.clear()
+
+            return "" // 成功回傳空字串
+        } else {
+            return "註冊失敗，資料庫錯誤"
+        }
     }
 
+    // ★ 修改：登入邏輯
     fun login(email: String, pass: String): Boolean {
-        val savedEmail = prefs.getString("user_email", "")
-        val savedPass = prefs.getString("user_pass", "")
+        // 取得使用者資訊 (ID, Name)
+        val userInfo = dbHandler.validateUser(email, pass)
 
-        if (email == savedEmail && pass == savedPass) {
-            prefs.edit().putBoolean("is_logged_in", true).apply()
-            userName = prefs.getString("user_name", "") ?: ""
-            userEmail = savedEmail ?: ""
+        if (userInfo != null) {
+            val (id, name) = userInfo
+
+            // 儲存登入狀態
+            prefs.edit()
+                .putInt("user_id", id) // 儲存 ID
+                .putString("user_name", name)
+                .putString("user_email", email)
+                .putBoolean("is_logged_in", true)
+                .apply()
+
+            currentUserId = id
+            userName = name
+            userEmail = email
             isLoggedIn = true
+
+            // ★ 登入後，重新載入該使用者的資料
+            loadData()
+
             return true
         }
         return false
@@ -280,22 +324,32 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun checkLoginStatus() {
         if (!prefs.contains("user_email")) {
-            register("Default User", "u11216004", "u11216004")
             logout()
         }
 
         isLoggedIn = prefs.getBoolean("is_logged_in", false)
         if (isLoggedIn) {
+            // 從 prefs 恢復狀態
+            currentUserId = prefs.getInt("user_id", -1)
             userName = prefs.getString("user_name", "") ?: ""
             userEmail = prefs.getString("user_email", "") ?: ""
         }
     }
 
+    // ★ 修改：登出邏輯
     fun logout() {
-        prefs.edit().putBoolean("is_logged_in", false).apply()
+        prefs.edit()
+            .putBoolean("is_logged_in", false)
+            .remove("user_id") // 清除 ID
+            .apply()
+
         isLoggedIn = false
         userName = ""
         userEmail = ""
+        currentUserId = -1
+
+        // 登出後清空記帳列表
+        _transactions.clear()
     }
 
     fun updateBudget(newBudget: Int) {
@@ -313,19 +367,21 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         prefs.edit().putString("app_language", newLang).apply()
     }
 
-    // 新增資料
+    // ★ 修改：新增資料時傳入 currentUserId
     fun addTransaction(title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
+        if (currentUserId == -1) return // 未登入不處理
+
         val formatD = SimpleDateFormat(currentStrings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
         val formatW = SimpleDateFormat(currentStrings.dayFormat, if(language=="English") Locale.US else Locale.TAIWAN)
 
         val dateStr = formatD.format(dateMillis)
         val dayStr = formatW.format(dateMillis)
 
-        dbHandler.addTransaction(dateStr, dayStr, title, amount, type, categoryKey)
+        dbHandler.addTransaction(currentUserId, dateStr, dayStr, title, amount, type, categoryKey)
         loadData()
     }
 
-    // 更新資料
+    // 更新資料 (不需要 userId，因為 id 是唯一的 PK)
     fun updateTransaction(id: Long, title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
         val formatD = SimpleDateFormat(currentStrings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
         val formatW = SimpleDateFormat(currentStrings.dayFormat, if(language=="English") Locale.US else Locale.TAIWAN)
@@ -337,13 +393,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         loadData()
     }
 
-    // 刪除資料
     fun deleteTransaction(id: Long) {
         dbHandler.deleteTransaction(id)
         loadData()
     }
 
-    // 取得單筆資料 (for 編輯畫面)
     fun getTransactionById(id: Long): Transaction? {
         return dbHandler.getTransactionById(id)
     }
@@ -362,10 +416,15 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         return if (budget > 0) ((r.toFloat() / budget) * 100).toInt() else 0
     }
 
+    // ★ 修改：根據 currentUserId 載入資料
     private fun loadData() {
-        val list = dbHandler.getAllTransactions()
-        _transactions.clear()
-        _transactions.addAll(list)
+        if (currentUserId != -1) {
+            val list = dbHandler.getAllTransactions(currentUserId)
+            _transactions.clear()
+            _transactions.addAll(list)
+        } else {
+            _transactions.clear()
+        }
     }
 
     private fun loadSettings() {

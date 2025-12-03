@@ -122,10 +122,16 @@ fun LoginScreen(
                     if (email.isBlank() || password.isBlank() || (isRegisterMode && name.isBlank())) {
                         errorMessage = strings.errorEmptyField
                     } else {
-                        // 呼叫 ViewModel 進行登入/註冊
                         if (isRegisterMode) {
-                            vm.register(name, email, password)
-                            onLoginSuccess()
+                            // ★ 修改：取得註冊結果
+                            val result = vm.register(name, email, password)
+                            if (result.isEmpty()) {
+                                // 空字串代表成功
+                                onLoginSuccess()
+                            } else {
+                                // 有字串代表錯誤訊息 (如：使用者名稱重複)
+                                errorMessage = result
+                            }
                         } else {
                             if (vm.login(email, password)) {
                                 onLoginSuccess()
