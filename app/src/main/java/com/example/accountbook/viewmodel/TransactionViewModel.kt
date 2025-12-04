@@ -11,9 +11,10 @@ import androidx.lifecycle.AndroidViewModel
 import com.example.accountbook.data.DBHandler
 import java.io.Serializable
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
-// ---------------- 多語系資源定義 (保持原樣) ----------------
+// ---------------- 多語系資源定義 (完整版) ----------------
 interface StringResources {
     val loginTitle: String
     val registerTitle: String
@@ -200,6 +201,14 @@ data class Transaction(
     val categoryKey: String = ""
 ) : Serializable
 
+// ★ 新增：分類詳細統計資料結構
+data class CategoryStat(
+    val key: String,
+    val totalAmount: Int,
+    val count: Int,
+    val percentage: Float
+)
+
 class TransactionViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
@@ -229,7 +238,30 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val _transactions = mutableStateListOf<Transaction>()
     val transactions: List<Transaction> get() = _transactions
 
-    // ★ 新增：圖表資料狀態
+    // --- Chart Screen States ---
+    var chartYear by mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
+    var chartMonth by mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1)
+
+    // Tab: 0=支出, 1=收入, 2=結餘 (目前主要實作 0 與 1)
+    var chartTab by mutableIntStateOf(0)
+
+    // 每日統計 (Day -> Amount)
+    var monthlyDailyStats by mutableStateOf<Map<Int, Int>>(emptyMap())
+        private set
+
+    // 平均每日
+    var averageDaily by mutableIntStateOf(0)
+        private set
+
+    // 分類統計列表
+    var monthlyCategoryStats by mutableStateOf<List<CategoryStat>>(emptyList())
+        private set
+
+    // 月總金額
+    var monthlyTotal by mutableIntStateOf(0)
+        private set
+
+    // 舊的 (給首頁用)
     var categoryTotals by mutableStateOf<Map<String, Int>>(emptyMap())
         private set
     var dailyTotals by mutableStateOf<List<Pair<String, Int>>>(emptyList())
@@ -331,8 +363,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         userEmail = ""
         currentUserId = -1
         _transactions.clear()
-        categoryTotals = emptyMap()
-        dailyTotals = emptyList()
     }
 
     fun updateBudget(newBudget: Int) {
@@ -403,19 +433,48 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             _transactions.clear()
             _transactions.addAll(list)
 
-            // ★ 載入圖表資料
-            loadChartData()
+            // 載入 Home Screen 用的簡單圖表
+            categoryTotals = dbHandler.getCategoryTotals(currentUserId)
+            dailyTotals = dbHandler.getRecentDailyTotals(currentUserId)
+
+            // ★ 同步更新詳細圖表頁面
+            loadMonthlyChartData()
         } else {
             _transactions.clear()
         }
     }
 
-    // ★ 新增：載入圖表所需的統計資料
-    fun loadChartData() {
-        if (currentUserId != -1) {
-            categoryTotals = dbHandler.getCategoryTotals(currentUserId)
-            dailyTotals = dbHandler.getRecentDailyTotals(currentUserId)
+    // ★ 新增：載入圖表頁面的詳細數據
+    fun loadMonthlyChartData() {
+        if (currentUserId == -1) return
+
+        // 判斷 Tab (支出/收入)
+        val typeFilter = if (chartTab == 1) "收入" else "支出" // 0 或其他都當作支出
+
+        // 1. 載入每日統計 (給長條圖)
+        monthlyDailyStats = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, typeFilter)
+
+        // 計算平均每日
+        val daysInMonth = getDaysInMonth(chartYear, chartMonth)
+        // 這裡平均可以除以「當月天數」或「截至目前的有資料天數」，通常除以當月總天數或30
+        val totalSum = monthlyDailyStats.values.sum()
+        monthlyTotal = totalSum
+        averageDaily = if (daysInMonth > 0) totalSum / daysInMonth else 0
+
+        // 2. 載入分類統計 (給圓餅圖與列表)
+        val rawStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, typeFilter)
+
+        // 計算百分比並轉為 CategoryStat 物件
+        monthlyCategoryStats = rawStats.map { (key, sum, count) ->
+            val pct = if (totalSum > 0) (sum.toFloat() / totalSum) * 100 else 0f
+            CategoryStat(key, sum, count, pct)
         }
+    }
+
+    private fun getDaysInMonth(year: Int, month: Int): Int {
+        val cal = Calendar.getInstance()
+        cal.set(year, month - 1, 1)
+        return cal.getActualMaximum(Calendar.DAY_OF_MONTH)
     }
 
     private fun loadSettings() {

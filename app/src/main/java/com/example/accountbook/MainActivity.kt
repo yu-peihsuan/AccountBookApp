@@ -82,7 +82,6 @@ fun AccountBookApp() {
                 )
             }
 
-            // 修改：支援接收選用的 id 參數，預設為 -1 (新增模式)
             composable(
                 route = "add?id={id}",
                 arguments = listOf(navArgument("id") {
@@ -98,8 +97,13 @@ fun AccountBookApp() {
                 )
             }
 
+            // ★ 修正：ChartScreen 的參數傳遞
             composable("chart") {
-                ChartScreen(vm = vm, onBack = { navController.popBackStack() })
+                ChartScreen(
+                    vm = vm,
+                    onBack = { navController.popBackStack() }, // 這個給 onBack
+                    onOpenDrawer = { scope.launch { drawerState.open() } } // 這個給 Drawer
+                )
             }
 
             composable("setting") {
