@@ -56,7 +56,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         onCreate(db)
     }
 
-    // ... (保留原有的 User 相關方法: checkUserExists, addUser, validateUser) ...
+    // ... (保留原有的 User 相關方法) ...
     fun checkUserExists(name: String): Boolean {
         val db = this.readableDatabase
         val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE $USER_NAME_COL = ?", arrayOf(name))
@@ -180,17 +180,13 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return list
     }
 
-    // --- ★ 新增：取得特定月份的每日金額 (給長條圖用) ---
-    // typeFilter: "支出", "收入"
+    // --- 月檢視：取得特定月份的每日金額 ---
     fun getMonthlyDailyStats(userId: Int, year: Int, month: Int, typeFilter: String): Map<Int, Int> {
         val db = this.readableDatabase
         val map = HashMap<Int, Int>()
 
-        // 格式化月份，例如 2025/11%
         val monthStr = String.format("%04d/%02d", year, month) + "%"
         val isExpense = typeFilter == "支出" || typeFilter == "Expense"
-
-        // 根據語言/Type 篩選
         val typeQuery = if (isExpense) "($TYPE_COL = '支出' OR $TYPE_COL = 'Expense')" else "($TYPE_COL = '收入' OR $TYPE_COL = 'Income')"
 
         val cursor = db.rawQuery(
@@ -202,9 +198,8 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
 
         if (cursor.moveToFirst()) {
             do {
-                val date = cursor.getString(0) // yyyy/MM/dd
+                val date = cursor.getString(0)
                 val sum = cursor.getInt(1)
-                // 解析出日期中的 "日" (dd)
                 val parts = date.split("/")
                 if (parts.size == 3) {
                     val day = parts[2].toIntOrNull() ?: 0
@@ -216,8 +211,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return map
     }
 
-    // --- ★ 新增：取得特定月份的分類統計 (給圓餅圖與列表用) ---
-    // 回傳 List<Triple<CategoryKey, TotalAmount, Count>>
+    // --- 月檢視：取得特定月份的分類統計 ---
     fun getMonthlyCategoryStats(userId: Int, year: Int, month: Int, typeFilter: String): List<Triple<String, Int, Int>> {
         val db = this.readableDatabase
         val list = ArrayList<Triple<String, Int, Int>>()
@@ -245,7 +239,67 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return list
     }
 
-    // 為了相容 ViewModel 舊程式碼 (首頁圓餅圖)，保留這個舊方法
+    // --- ★ 新增：年檢視 - 取得特定年份的每月金額 ---
+    // 回傳 Map<Int, Int>，Key 為月份 (1~12)，Value 為該月總額
+    fun getYearlyMonthlyStats(userId: Int, year: Int, typeFilter: String): Map<Int, Int> {
+        val db = this.readableDatabase
+        val map = HashMap<Int, Int>()
+        val yearStr = "$year/%" // 格式: 2025/%
+        val isExpense = typeFilter == "支出" || typeFilter == "Expense"
+        val typeQuery = if (isExpense) "($TYPE_COL = '支出' OR $TYPE_COL = 'Expense')" else "($TYPE_COL = '收入' OR $TYPE_COL = 'Income')"
+
+        // 這裡我們取回所有該年的交易，然後在程式碼中依月份加總
+        val cursor = db.rawQuery(
+            "SELECT $DATE_COL, SUM($AMOUNT_COL) FROM $TABLE_NAME " +
+                    "WHERE $TR_USER_ID_COL = ? AND $typeQuery AND $DATE_COL LIKE ? " +
+                    "GROUP BY $DATE_COL",
+            arrayOf(userId.toString(), yearStr)
+        )
+
+        if (cursor.moveToFirst()) {
+            do {
+                val date = cursor.getString(0) // yyyy/MM/dd
+                val sum = cursor.getInt(1)
+                val parts = date.split("/")
+                if (parts.size >= 2) {
+                    val m = parts[1].toIntOrNull() ?: 0
+                    // 累加到 Map 中
+                    map[m] = map.getOrDefault(m, 0) + sum
+                }
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return map
+    }
+
+    // --- ★ 新增：年檢視 - 取得特定年份的分類統計 ---
+    fun getYearlyCategoryStats(userId: Int, year: Int, typeFilter: String): List<Triple<String, Int, Int>> {
+        val db = this.readableDatabase
+        val list = ArrayList<Triple<String, Int, Int>>()
+        val yearStr = "$year/%"
+        val isExpense = typeFilter == "支出" || typeFilter == "Expense"
+        val typeQuery = if (isExpense) "($TYPE_COL = '支出' OR $TYPE_COL = 'Expense')" else "($TYPE_COL = '收入' OR $TYPE_COL = 'Income')"
+
+        val cursor = db.rawQuery(
+            "SELECT $CATEGORY_KEY_COL, SUM($AMOUNT_COL), COUNT($ID_COL) FROM $TABLE_NAME " +
+                    "WHERE $TR_USER_ID_COL = ? AND $typeQuery AND $DATE_COL LIKE ? " +
+                    "GROUP BY $CATEGORY_KEY_COL ORDER BY SUM($AMOUNT_COL) DESC",
+            arrayOf(userId.toString(), yearStr)
+        )
+
+        if (cursor.moveToFirst()) {
+            do {
+                val key = cursor.getString(0) ?: "other"
+                val sum = cursor.getInt(1)
+                val count = cursor.getInt(2)
+                list.add(Triple(key, sum, count))
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return list
+    }
+
+    // 舊方法 (首頁圓餅圖用)
     fun getCategoryTotals(userId: Int): Map<String, Int> {
         val db = this.readableDatabase
         val map = HashMap<String, Int>()
@@ -266,7 +320,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return map
     }
 
-    // 保留舊方法給首頁長條圖
+    // 舊方法 (首頁長條圖用)
     fun getRecentDailyTotals(userId: Int): List<Pair<String, Int>> {
         val db = this.readableDatabase
         val list = ArrayList<Pair<String, Int>>()

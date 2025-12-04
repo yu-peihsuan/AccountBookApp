@@ -33,9 +33,9 @@ import com.example.accountbook.viewmodel.TransactionViewModel
 import java.util.Locale
 
 // 定義顏色
-val TopBarBgColor = Color(0xFFFCF5E8) // ★ 上方米色
-val BodyBgColor = Color.White         // ★ 下方白色
-val ChartYellow = Color(0xFFEAC45D)   // 圖表黃 (稍微深一點以符合圖片)
+val TopBarBgColor = Color(0xFFFCF5E8)
+val BodyBgColor = Color.White
+val ChartYellow = Color(0xFFEAC45D)
 val ChartBlue = Color(0xFF7CB9E8)
 val ChartGreen = Color(0xFF81C784)
 val ChartPink = Color(0xFFE57373)
@@ -49,20 +49,19 @@ fun ChartScreen(
     onBack: () -> Unit,
     onOpenDrawer: () -> Unit
 ) {
-    // 監聽年份、月份與 Tab 變化，重新載入資料
-    LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab) {
+    // 監聽年份、月份、Tab 與模式變化，重新載入資料
+    LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab, vm.chartTimeMode) {
         vm.loadMonthlyChartData()
     }
 
     Scaffold(
-        containerColor = BodyBgColor, // ★ 修改：整體背景改為白色
+        containerColor = BodyBgColor,
         topBar = {
-            // ★ 修改：只有這一塊是米色
             Column(Modifier.background(TopBarBgColor)) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 16.dp) // 增加一點底部 padding 讓米色區塊顯眼
+                        .padding(top = 16.dp, bottom = 16.dp)
                 ) {
                     // 左側 Menu Icon
                     IconButton(
@@ -110,25 +109,24 @@ fun ChartScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .background(BodyBgColor), // 確保內容區是白色
+                .background(BodyBgColor),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
             Spacer(Modifier.height(16.dp))
 
-            // 1. 時間篩選器 (移到這裡，背景為白)
+            // 1. 時間篩選器
             TimeFilterSection(vm)
 
             Spacer(Modifier.height(24.dp))
 
-            // 內容區塊加上 padding
             Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // 2. 每日趨勢圖卡片
+                // 2. 每日/每月趨勢圖卡片
                 DailyTrendCard(vm)
 
                 // 3. 交易類型 (甜甜圈圖 + 圖例)
@@ -153,7 +151,7 @@ fun TimeFilterSection(vm: TransactionViewModel) {
         // (A) 月 / 年 / 自訂 膠囊按鈕
         Row(
             Modifier
-                .width(300.dp) // ★ 設定固定寬度讓它像圖片一樣長
+                .width(300.dp)
                 .border(1.dp, Color.LightGray, RoundedCornerShape(50))
                 .clip(RoundedCornerShape(50))
                 .background(Color.White)
@@ -161,14 +159,13 @@ fun TimeFilterSection(vm: TransactionViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             val filters = listOf("月", "年", "自訂")
-            var selectedFilter by remember { mutableIntStateOf(0) } // 0=月 (預設)
 
             filters.forEachIndexed { index, text ->
-                val isSelected = selectedFilter == index
+                val isSelected = vm.chartTimeMode == index
                 Box(
                     Modifier
-                        .weight(1f) // 平均分配寬度
-                        .clickable { selectedFilter = index }
+                        .weight(1f)
+                        .clickable { vm.chartTimeMode = index }
                         .padding(vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -183,41 +180,61 @@ fun TimeFilterSection(vm: TransactionViewModel) {
 
         Spacer(Modifier.height(16.dp))
 
-        // (B) 日期切換 ( < 2025年 11月 > )
+        // (B) 日期切換
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween // 讓箭頭分開一點，或者用 Center 也可以
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // 為了讓中間文字置中，我們可以用 Box 或 Weight
+            // 左箭頭
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                 IconButton(onClick = {
-                    if (vm.chartMonth == 1) {
-                        vm.chartMonth = 12
+                    if (vm.chartTimeMode == 1) {
+                        // 年模式：減一年
                         vm.chartYear--
                     } else {
-                        vm.chartMonth--
+                        // 月模式：減一月
+                        if (vm.chartMonth == 1) {
+                            vm.chartMonth = 12
+                            vm.chartYear--
+                        } else {
+                            vm.chartMonth--
+                        }
                     }
                 }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = TextDark)
                 }
             }
 
+            // 中間日期文字
+            val displayDate = if (vm.chartTimeMode == 1) {
+                "${vm.chartYear}年"
+            } else {
+                "${vm.chartYear}年 ${vm.chartMonth}月"
+            }
+
             Text(
-                "${vm.chartYear}年 ${vm.chartMonth}月",
+                displayDate,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextDark,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
+            // 右箭頭
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 IconButton(onClick = {
-                    if (vm.chartMonth == 12) {
-                        vm.chartMonth = 1
+                    if (vm.chartTimeMode == 1) {
+                        // 年模式：加一年
                         vm.chartYear++
                     } else {
-                        vm.chartMonth++
+                        // 月模式：加一月
+                        if (vm.chartMonth == 12) {
+                            vm.chartMonth = 1
+                            vm.chartYear++
+                        } else {
+                            vm.chartMonth++
+                        }
                     }
                 }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextDark)
@@ -227,14 +244,19 @@ fun TimeFilterSection(vm: TransactionViewModel) {
     }
 }
 
-// --- 元件: 每日趨勢圖卡片 ---
+// --- 元件: 趨勢圖卡片 ---
 @Composable
 fun DailyTrendCard(vm: TransactionViewModel) {
+    val isYearMode = vm.chartTimeMode == 1
+    val title = if (isYearMode) "每月趨勢" else "每日趨勢"
+    val avgLabel = if (isYearMode) "平均每月" else "平均每日"
+
     Column {
-        // ★ 標題列：Icon + 文字
+        // 標題列
         Row(verticalAlignment = Alignment.CenterVertically) {
+
             Spacer(Modifier.width(8.dp))
-            Text("每日趨勢", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark)
+            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -245,15 +267,15 @@ fun DailyTrendCard(vm: TransactionViewModel) {
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(240.dp) // 稍微加高一點
+                .height(240.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
-                // 圖例 (Legend)
+                // 圖例
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(12.dp, 3.dp).background(DashBlue))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "平均每日 : ${if(vm.chartTab==0) "-" else ""}${vm.currency}${vm.averageDaily}",
+                        "$avgLabel : ${if(vm.chartTab==0) "-" else ""}${vm.currency}${vm.averageDaily}",
                         color = Color.Gray,
                         fontSize = 14.sp
                     )
@@ -262,14 +284,15 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                 Spacer(Modifier.height(20.dp))
 
                 // 長條圖 Canvas
+                // 如果是年模式，顯示 12 個月；否則顯示 31 天
                 val data = vm.monthlyDailyStats
-                val daysInMonth = 31
+                val count = if (isYearMode) 12 else 31
 
                 Canvas(Modifier.fillMaxSize()) {
-                    val barWidth = 6.dp.toPx() // 稍微調細一點，符合圖片
-                    val spacing = (size.width - (daysInMonth * barWidth)) / (daysInMonth - 1)
+                    val barWidth = if (isYearMode) 12.dp.toPx() else 6.dp.toPx()
+                    val spacing = (size.width - (count * barWidth)) / (count - 1)
                     val maxVal = (data.values.maxOrNull() ?: 1).coerceAtLeast(vm.averageDaily * 2).toFloat()
-                    val chartHeight = size.height - 40f // 預留底部文字空間
+                    val chartHeight = size.height - 40f
 
                     // 1. 畫平均線 (藍色虛線)
                     val avgY = chartHeight - (vm.averageDaily / maxVal * chartHeight)
@@ -277,11 +300,11 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                         color = DashBlue,
                         start = Offset(0f, avgY),
                         end = Offset(size.width, avgY),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f)), // 虛線間距大一點
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f)),
                         strokeWidth = 3f
                     )
 
-                    // 2. 畫底部黃色基準線 (★ 新增)
+                    // 2. 畫底部黃色基準線
                     drawLine(
                         color = ChartYellow,
                         start = Offset(0f, chartHeight),
@@ -290,9 +313,8 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                     )
 
                     // 3. 畫長條
-                    for (i in 1..daysInMonth) {
+                    for (i in 1..count) {
                         val amount = data[i] ?: 0
-
                         val x = (i - 1) * (barWidth + spacing)
 
                         if (amount > 0) {
@@ -306,15 +328,15 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                             )
                         }
 
-                        // 4. 畫 X 軸標籤 (1, 3, 5...)
-                        if (i % 2 != 0) { // 只畫奇數
+                        // 4. 畫 X 軸標籤
+                        // 年模式全畫 (1..12)，月模式只畫奇數 (1, 3, 5...)
+                        if (isYearMode || i % 2 != 0) {
                             val textPaint = android.graphics.Paint().apply {
                                 color = android.graphics.Color.LTGRAY
                                 textSize = 30f
-                                textAlign = android.graphics.Paint.Align.LEFT
+                                textAlign = android.graphics.Paint.Align.CENTER
                             }
-                            // 修正文字位置置中
-                            val textX = x - 5f
+                            val textX = x + barWidth / 2
                             drawContext.canvas.nativeCanvas.drawText(
                                 "$i", textX, size.height, textPaint
                             )
@@ -326,7 +348,7 @@ fun DailyTrendCard(vm: TransactionViewModel) {
     }
 }
 
-// --- 元件: 交易類型 (甜甜圈圖) ---
+// --- 元件: 交易類型 ---
 @Composable
 fun TypeAnalysisCard(vm: TransactionViewModel) {
     val stats = vm.monthlyCategoryStats
@@ -335,7 +357,6 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
 
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // 這裡也可以加 Icon，但圖片沒顯示，保持原樣
             Text("  交易類型", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
         }
 

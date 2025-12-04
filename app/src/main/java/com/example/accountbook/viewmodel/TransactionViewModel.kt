@@ -201,7 +201,6 @@ data class Transaction(
     val categoryKey: String = ""
 ) : Serializable
 
-// ★ 新增：分類詳細統計資料結構
 data class CategoryStat(
     val key: String,
     val totalAmount: Int,
@@ -242,14 +241,17 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var chartYear by mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
     var chartMonth by mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1)
 
-    // Tab: 0=支出, 1=收入, 2=結餘 (目前主要實作 0 與 1)
+    // Tab: 0=支出, 1=收入
     var chartTab by mutableIntStateOf(0)
 
-    // 每日統計 (Day -> Amount)
+    // ★ 新增：時間模式 0=月, 1=年, 2=自訂
+    var chartTimeMode by mutableIntStateOf(0)
+
+    // 每日(或每月)統計 Map: Key=Day/Month, Value=Amount
     var monthlyDailyStats by mutableStateOf<Map<Int, Int>>(emptyMap())
         private set
 
-    // 平均每日
+    // 平均
     var averageDaily by mutableIntStateOf(0)
         private set
 
@@ -257,7 +259,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var monthlyCategoryStats by mutableStateOf<List<CategoryStat>>(emptyList())
         private set
 
-    // 月總金額
+    // 總金額
     var monthlyTotal by mutableIntStateOf(0)
         private set
 
@@ -444,30 +446,43 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 新增：載入圖表頁面的詳細數據
+    // ★ 載入圖表頁面的詳細數據 (根據 chartTimeMode 切換月/年)
     fun loadMonthlyChartData() {
         if (currentUserId == -1) return
 
-        // 判斷 Tab (支出/收入)
-        val typeFilter = if (chartTab == 1) "收入" else "支出" // 0 或其他都當作支出
+        val typeFilter = if (chartTab == 1) "收入" else "支出"
 
-        // 1. 載入每日統計 (給長條圖)
-        monthlyDailyStats = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, typeFilter)
+        if (chartTimeMode == 1) {
+            // === 年檢視模式 ===
+            // 1. 載入每月統計 (給長條圖: Key是月份 1~12)
+            monthlyDailyStats = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, typeFilter)
 
-        // 計算平均每日
-        val daysInMonth = getDaysInMonth(chartYear, chartMonth)
-        // 這裡平均可以除以「當月天數」或「截至目前的有資料天數」，通常除以當月總天數或30
-        val totalSum = monthlyDailyStats.values.sum()
-        monthlyTotal = totalSum
-        averageDaily = if (daysInMonth > 0) totalSum / daysInMonth else 0
+            // 計算平均 (簡單起見除以 12)
+            val totalSum = monthlyDailyStats.values.sum()
+            monthlyTotal = totalSum
+            averageDaily = if (totalSum > 0) totalSum / 12 else 0
 
-        // 2. 載入分類統計 (給圓餅圖與列表)
-        val rawStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, typeFilter)
+            // 2. 載入分類統計 (整年)
+            val rawStats = dbHandler.getYearlyCategoryStats(currentUserId, chartYear, typeFilter)
+            monthlyCategoryStats = rawStats.map { (key, sum, count) ->
+                val pct = if (totalSum > 0) (sum.toFloat() / totalSum) * 100 else 0f
+                CategoryStat(key, sum, count, pct)
+            }
 
-        // 計算百分比並轉為 CategoryStat 物件
-        monthlyCategoryStats = rawStats.map { (key, sum, count) ->
-            val pct = if (totalSum > 0) (sum.toFloat() / totalSum) * 100 else 0f
-            CategoryStat(key, sum, count, pct)
+        } else {
+            // === 月檢視模式 (原有邏輯) ===
+            monthlyDailyStats = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, typeFilter)
+
+            val daysInMonth = getDaysInMonth(chartYear, chartMonth)
+            val totalSum = monthlyDailyStats.values.sum()
+            monthlyTotal = totalSum
+            averageDaily = if (daysInMonth > 0) totalSum / daysInMonth else 0
+
+            val rawStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, typeFilter)
+            monthlyCategoryStats = rawStats.map { (key, sum, count) ->
+                val pct = if (totalSum > 0) (sum.toFloat() / totalSum) * 100 else 0f
+                CategoryStat(key, sum, count, pct)
+            }
         }
     }
 
