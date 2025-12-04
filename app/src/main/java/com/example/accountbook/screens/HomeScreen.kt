@@ -84,6 +84,7 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
         MonthPickerDialog(
             year = currentYear,
             month = currentMonth,
+            showMonth = true, // ★ 首頁固定顯示月份
             onDismiss = { showMonthPicker = false },
             onConfirm = { y, m ->
                 currentYear = y

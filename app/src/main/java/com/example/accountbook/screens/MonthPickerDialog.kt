@@ -1,10 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package com.example.accountbook.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,59 +15,151 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @Composable
 fun MonthPickerDialog(
     year: Int,
     month: Int,
+    showMonth: Boolean,
+    accentColor: Color = Color(0xFFEAC45D),
     onDismiss: () -> Unit,
     onConfirm: (Int, Int) -> Unit
 ) {
+    // 年份範圍 (前後 10 年)
+    val years = (year - 10..year + 10).toList()
+    val months = (1..12).toList()
 
-    var tempYear by remember { mutableIntStateOf(year) }
+    // 初始索引
+    val initialYearIndex = years.indexOf(year).coerceAtLeast(0)
+    val initialMonthIndex = months.indexOf(month).coerceAtLeast(0)
 
-    AlertDialog(onDismissRequest = onDismiss) {
+    var selectedYear by remember { mutableIntStateOf(year) }
+    var selectedMonth by remember { mutableIntStateOf(month) }
 
-        Column(
-            Modifier.background(Color.White, RoundedCornerShape(16.dp))
-                .padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = {
+            Text(
+                if (showMonth) "選擇月份" else "選擇年份",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp // ★ 標題字體調小
+            )
+        },
+        text = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 年份滾輪
+                WheelPicker(
+                    items = years,
+                    initialIndex = initialYearIndex,
+                    visibleCount = 3,
+                    activeColor = accentColor,
+                    modifier = Modifier.weight(1f),
+                    onSelectionChanged = { selectedYear = it }
+                )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { tempYear-- }) { Text("←") }
-                Text("$tempYear 年", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { tempYear++ }) { Text("→") }
-            }
+                Text("年", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
 
-            (1..12).chunked(4).forEach { row ->
-                Row {
-                    row.forEach { m ->
-                        Box(
-                            Modifier
-                                .padding(6.dp)
-                                .size(55.dp)
-                                .background(
-                                    if (tempYear == year && m == month) Color(0xFFEAC45D)
-                                    else Color(0xFFEFEFEF),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable {
-                                    onConfirm(tempYear, m)
-                                    onDismiss()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("${m}月", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                if (showMonth) {
+                    WheelPicker(
+                        items = months,
+                        initialIndex = initialMonthIndex,
+                        visibleCount = 3,
+                        activeColor = accentColor,
+                        modifier = Modifier.weight(1f),
+                        onSelectionChanged = { selectedMonth = it }
+                    )
+
+                    Text("月", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 }
             }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(selectedYear, selectedMonth) },
+                //colors = ButtonDefaults.textButtonColors(contentColor = accentColor)
+            ) {
+                Text("確定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray)) {
+                Text("取消")
+            }
+        }
+    )
+}
 
-            Spacer(Modifier.height(4.dp))
-            TextButton(onClick = onDismiss) { Text("取消") }
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun <T> WheelPicker(
+    items: List<T>,
+    initialIndex: Int,
+    visibleCount: Int = 3,
+    activeColor: Color,
+    modifier: Modifier = Modifier,
+    onSelectionChanged: (T) -> Unit
+) {
+    val itemHeight = 40.dp
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val centerIndex = listState.firstVisibleItemIndex
+            if (centerIndex in items.indices) {
+                onSelectionChanged(items[centerIndex])
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier.height(itemHeight * visibleCount),
+        contentAlignment = Alignment.Center
+    ) {
+        // 選中項目的背景高亮
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(itemHeight)
+                .background(activeColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+        )
+
+        LazyColumn(
+            state = listState,
+            flingBehavior = flingBehavior,
+            contentPadding = PaddingValues(vertical = itemHeight * (visibleCount / 2)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(items.size) { index ->
+                val item = items[index]
+                val isSelected = index == listState.firstVisibleItemIndex
+                Box(
+                    modifier = Modifier
+                        .height(itemHeight)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = item.toString(),
+                        fontSize = 20.sp, // ★ 滾輪數字調小為 18.sp
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) Color.Black else Color.Gray
+                    )
+                }
+            }
         }
     }
 }

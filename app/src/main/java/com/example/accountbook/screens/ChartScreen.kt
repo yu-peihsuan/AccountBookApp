@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.accountbook.viewmodel.TransactionViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+import java.util.Calendar
 
 // 定義顏色
 val TopBarBgColor = Color(0xFFFCF5E8)
@@ -49,8 +53,8 @@ fun ChartScreen(
     onBack: () -> Unit,
     onOpenDrawer: () -> Unit
 ) {
-    // 監聽年份、月份、Tab 與模式變化，重新載入資料
-    LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab, vm.chartTimeMode) {
+    // 監聽年份、月份、Tab、模式、自訂日期變化，重新載入資料
+    LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab, vm.chartTimeMode, vm.customStartDateMillis, vm.customEndDateMillis) {
         vm.loadMonthlyChartData()
     }
 
@@ -126,13 +130,13 @@ fun ChartScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // 2. 每日/每月趨勢圖卡片
+                // 2. 趨勢圖卡片
                 DailyTrendCard(vm)
 
                 // 3. 交易類型 (甜甜圈圖 + 圖例)
                 TypeAnalysisCard(vm)
 
-                // 4. 支出/收入明細列表
+                // 4. 明細列表
                 DetailListCard(vm)
 
                 Spacer(Modifier.height(40.dp))
@@ -141,9 +145,14 @@ fun ChartScreen(
     }
 }
 
-// --- 元件: 時間篩選區塊 與 日期切換 ---
+// --- 元件: 時間篩選區塊 ---
 @Composable
 fun TimeFilterSection(vm: TransactionViewModel) {
+    var showMonthPicker by remember { mutableStateOf(false) }
+
+    // 控制日期選擇器的顯示 (0:無, 1:起始日期, 2:結束日期)
+    var datePickerState by remember { mutableIntStateOf(0) }
+
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -180,81 +189,197 @@ fun TimeFilterSection(vm: TransactionViewModel) {
 
         Spacer(Modifier.height(16.dp))
 
-        // (B) 日期切換
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // 左箭頭
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                IconButton(onClick = {
-                    if (vm.chartTimeMode == 1) {
-                        // 年模式：減一年
-                        vm.chartYear--
-                    } else {
-                        // 月模式：減一月
-                        if (vm.chartMonth == 1) {
-                            vm.chartMonth = 12
+        // (B) 日期顯示區
+        if (vm.chartTimeMode == 2) {
+            // === 自訂模式：顯示兩個日期框與快速按鈕 ===
+            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+            val startStr = sdf.format(Date(vm.customStartDateMillis))
+            val endStr = sdf.format(Date(vm.customEndDateMillis))
+
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                DateBox(dateStr = startStr, onClick = { datePickerState = 1 })
+                Text("~", fontSize = 20.sp, color = TextDark, fontWeight = FontWeight.Bold)
+                DateBox(dateStr = endStr, onClick = { datePickerState = 2 })
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 快速選擇按鈕
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickChip("近7天") { vm.applyQuickRange("7days") }
+                QuickChip("近30天") { vm.applyQuickRange("30days") }
+                QuickChip("本月") { vm.applyQuickRange("thisMonth") }
+            }
+
+        } else {
+            // === 月/年模式：顯示左右箭頭與日期 ===
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // 左箭頭
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    IconButton(onClick = {
+                        if (vm.chartTimeMode == 1) {
                             vm.chartYear--
                         } else {
-                            vm.chartMonth--
+                            if (vm.chartMonth == 1) {
+                                vm.chartMonth = 12
+                                vm.chartYear--
+                            } else {
+                                vm.chartMonth--
+                            }
                         }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = TextDark)
                     }
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = TextDark)
                 }
-            }
 
-            // 中間日期文字
-            val displayDate = if (vm.chartTimeMode == 1) {
-                "${vm.chartYear}年"
-            } else {
-                "${vm.chartYear}年 ${vm.chartMonth}月"
-            }
+                // 中間日期文字 (可點擊開啟滾動式選擇器)
+                val displayDate = if (vm.chartTimeMode == 1) {
+                    "${vm.chartYear}年"
+                } else {
+                    "${vm.chartYear}年 ${vm.chartMonth}月"
+                }
 
-            Text(
-                displayDate,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextDark,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+                Box(
+                    Modifier
+                        .clickable { showMonthPicker = true }
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        displayDate,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
 
-            // 右箭頭
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                IconButton(onClick = {
-                    if (vm.chartTimeMode == 1) {
-                        // 年模式：加一年
-                        vm.chartYear++
-                    } else {
-                        // 月模式：加一月
-                        if (vm.chartMonth == 12) {
-                            vm.chartMonth = 1
+                // 右箭頭
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    IconButton(onClick = {
+                        if (vm.chartTimeMode == 1) {
                             vm.chartYear++
                         } else {
-                            vm.chartMonth++
+                            if (vm.chartMonth == 12) {
+                                vm.chartMonth = 1
+                                vm.chartYear++
+                            } else {
+                                vm.chartMonth++
+                            }
                         }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextDark)
                     }
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextDark)
                 }
             }
         }
     }
+
+    // 滾動式月份選擇器 Dialog
+    if (showMonthPicker) {
+        MonthPickerDialog(
+            year = vm.chartYear,
+            month = vm.chartMonth,
+            showMonth = (vm.chartTimeMode == 0), // ★ 如果是年模式(1)，不顯示月份
+            onDismiss = { showMonthPicker = false },
+            onConfirm = { y, m ->
+                vm.chartYear = y
+                vm.chartMonth = m
+                showMonthPicker = false
+            }
+        )
+    }
+
+    // 單一日期選擇器 (用於自訂起始與結束日期)
+    if (datePickerState != 0) {
+        val initialDate = if (datePickerState == 1) vm.customStartDateMillis else vm.customEndDateMillis
+        val dateState = rememberDatePickerState(initialSelectedDateMillis = initialDate)
+
+        DatePickerDialog(
+            onDismissRequest = { datePickerState = 0 },
+            confirmButton = {
+                TextButton(onClick = {
+                    dateState.selectedDateMillis?.let {
+                        if (datePickerState == 1) {
+                            vm.customStartDateMillis = it
+                            if (vm.customStartDateMillis > vm.customEndDateMillis) {
+                                vm.customEndDateMillis = vm.customStartDateMillis
+                            }
+                        } else {
+                            vm.customEndDateMillis = it
+                            if (vm.customEndDateMillis < vm.customStartDateMillis) {
+                                vm.customStartDateMillis = vm.customEndDateMillis
+                            }
+                        }
+                    }
+                    datePickerState = 0
+                }) { Text("確定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { datePickerState = 0 }) { Text("取消") }
+            }
+        ) {
+            DatePicker(state = dateState)
+        }
+    }
 }
 
-// --- 元件: 趨勢圖卡片 ---
+@Composable
+fun DateBox(dateStr: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .background(Color.White)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.DateRange, null, tint = TextDark, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(dateStr, fontSize = 16.sp, color = TextDark)
+        }
+    }
+}
+
+@Composable
+fun QuickChip(text: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(50))
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFFF9F9F9))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(text, fontSize = 12.sp, color = Color.Gray)
+    }
+}
+
 @Composable
 fun DailyTrendCard(vm: TransactionViewModel) {
     val isYearMode = vm.chartTimeMode == 1
-    val title = if (isYearMode) "每月趨勢" else "每日趨勢"
-    val avgLabel = if (isYearMode) "平均每月" else "平均每日"
+    val isCustomMode = vm.chartTimeMode == 2
+
+    val title = when {
+        isYearMode -> "每月趨勢"
+        isCustomMode -> "區間趨勢"
+        else -> "每日趨勢"
+    }
+
+    val avgLabel = when {
+        isYearMode -> "平均每月"
+        else -> "平均每日"
+    }
 
     Column {
-        // 標題列
         Row(verticalAlignment = Alignment.CenterVertically) {
-
             Spacer(Modifier.width(8.dp))
             Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark)
         }
@@ -270,7 +395,6 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                 .height(240.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
-                // 圖例
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(12.dp, 3.dp).background(DashBlue))
                     Spacer(Modifier.width(8.dp))
@@ -283,63 +407,72 @@ fun DailyTrendCard(vm: TransactionViewModel) {
 
                 Spacer(Modifier.height(20.dp))
 
-                // 長條圖 Canvas
-                // 如果是年模式，顯示 12 個月；否則顯示 31 天
-                val data = vm.monthlyDailyStats
-                val count = if (isYearMode) 12 else 31
+                val dataPoints = vm.chartDataPoints
+                val count = dataPoints.size
 
-                Canvas(Modifier.fillMaxSize()) {
-                    val barWidth = if (isYearMode) 12.dp.toPx() else 6.dp.toPx()
-                    val spacing = (size.width - (count * barWidth)) / (count - 1)
-                    val maxVal = (data.values.maxOrNull() ?: 1).coerceAtLeast(vm.averageDaily * 2).toFloat()
-                    val chartHeight = size.height - 40f
+                if (count == 0) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("無資料", color = Color.Gray)
+                    }
+                } else {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val chartWidth = size.width
+                        val chartHeight = size.height - 40f
 
-                    // 1. 畫平均線 (藍色虛線)
-                    val avgY = chartHeight - (vm.averageDaily / maxVal * chartHeight)
-                    drawLine(
-                        color = DashBlue,
-                        start = Offset(0f, avgY),
-                        end = Offset(size.width, avgY),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f)),
-                        strokeWidth = 3f
-                    )
+                        val spacing = if (count > 1) chartWidth / (count) else 0f
+                        val barWidth = (spacing * 0.6f).coerceAtMost(30.dp.toPx()).coerceAtLeast(2.dp.toPx())
 
-                    // 2. 畫底部黃色基準線
-                    drawLine(
-                        color = ChartYellow,
-                        start = Offset(0f, chartHeight),
-                        end = Offset(size.width, chartHeight),
-                        strokeWidth = 3f
-                    )
+                        val maxVal = (dataPoints.maxOfOrNull { it.second } ?: 1).coerceAtLeast(vm.averageDaily * 2).toFloat()
 
-                    // 3. 畫長條
-                    for (i in 1..count) {
-                        val amount = data[i] ?: 0
-                        val x = (i - 1) * (barWidth + spacing)
-
-                        if (amount > 0) {
-                            val barHeight = (amount / maxVal) * chartHeight
-                            val y = chartHeight - barHeight
-
-                            drawRect(
-                                color = ChartYellow,
-                                topLeft = Offset(x, y),
-                                size = Size(barWidth, barHeight)
+                        val avgY = chartHeight - (vm.averageDaily / maxVal * chartHeight)
+                        if (avgY >= 0) {
+                            drawLine(
+                                color = DashBlue,
+                                start = Offset(0f, avgY),
+                                end = Offset(size.width, avgY),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f)),
+                                strokeWidth = 3f
                             )
                         }
 
-                        // 4. 畫 X 軸標籤
-                        // 年模式全畫 (1..12)，月模式只畫奇數 (1, 3, 5...)
-                        if (isYearMode || i % 2 != 0) {
-                            val textPaint = android.graphics.Paint().apply {
-                                color = android.graphics.Color.LTGRAY
-                                textSize = 30f
-                                textAlign = android.graphics.Paint.Align.CENTER
+                        drawLine(
+                            color = ChartYellow,
+                            start = Offset(0f, chartHeight),
+                            end = Offset(size.width, chartHeight),
+                            strokeWidth = 3f
+                        )
+
+                        dataPoints.forEachIndexed { i, (label, amount) ->
+                            val cx = i * spacing + spacing / 2
+                            val x = cx - barWidth / 2
+
+                            if (amount > 0) {
+                                val barHeight = (amount / maxVal) * chartHeight
+                                val y = chartHeight - barHeight
+
+                                drawRect(
+                                    color = ChartYellow,
+                                    topLeft = Offset(x, y),
+                                    size = Size(barWidth, barHeight)
+                                )
                             }
-                            val textX = x + barWidth / 2
-                            drawContext.canvas.nativeCanvas.drawText(
-                                "$i", textX, size.height, textPaint
-                            )
+
+                            val step = when {
+                                count <= 12 -> 1
+                                count <= 31 -> 2
+                                else -> count / 10 + 1
+                            }
+
+                            if (i % step == 0) {
+                                val textPaint = android.graphics.Paint().apply {
+                                    color = android.graphics.Color.LTGRAY
+                                    textSize = 30f
+                                    textAlign = android.graphics.Paint.Align.CENTER
+                                }
+                                drawContext.canvas.nativeCanvas.drawText(
+                                    label, cx, size.height, textPaint
+                                )
+                            }
                         }
                     }
                 }
@@ -348,7 +481,6 @@ fun DailyTrendCard(vm: TransactionViewModel) {
     }
 }
 
-// --- 元件: 交易類型 ---
 @Composable
 fun TypeAnalysisCard(vm: TransactionViewModel) {
     val stats = vm.monthlyCategoryStats
@@ -431,7 +563,6 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
     }
 }
 
-// --- 元件: 明細列表 ---
 @Composable
 fun DetailListCard(vm: TransactionViewModel) {
     val stats = vm.monthlyCategoryStats
