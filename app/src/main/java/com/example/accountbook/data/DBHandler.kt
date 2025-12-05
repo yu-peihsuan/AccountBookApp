@@ -295,12 +295,11 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return list
     }
 
-    // --- ★ 自訂區間：取得區間內的每日金額 (回傳 Map<DateString, Amount>) ---
+    // --- 自訂區間：取得區間內的每日金額 ---
     fun getRangeDailyStats(userId: Int, startDate: String, endDate: String, typeFilter: String): Map<String, Int> {
         val db = this.readableDatabase
         val map = HashMap<String, Int>()
 
-        // SQLite 字串比較： date >= startDate AND date <= endDate
         val isExpense = typeFilter == "支出" || typeFilter == "Expense"
         val typeQuery = if (isExpense) "($TYPE_COL = '支出' OR $TYPE_COL = 'Expense')" else "($TYPE_COL = '收入' OR $TYPE_COL = 'Income')"
 
@@ -322,7 +321,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return map
     }
 
-    // --- ★ 自訂區間：取得區間內的分類統計 ---
+    // --- 自訂區間：取得區間內的分類統計 ---
     fun getRangeCategoryStats(userId: Int, startDate: String, endDate: String, typeFilter: String): List<Triple<String, Int, Int>> {
         val db = this.readableDatabase
         val list = ArrayList<Triple<String, Int, Int>>()
@@ -343,6 +342,48 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
                 val sum = cursor.getInt(1)
                 val count = cursor.getInt(2)
                 list.add(Triple(key, sum, count))
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return list
+    }
+
+    // ★★★ 新增：取得特定分類在指定範圍內的詳細交易列表 ★★★
+    fun getCategoryTransactions(userId: Int, categoryKey: String, startDate: String, endDate: String, typeFilter: String, isLikeQuery: Boolean): List<Transaction> {
+        val db = this.readableDatabase
+        val list = ArrayList<Transaction>()
+
+        val isExpense = typeFilter == "支出" || typeFilter == "Expense"
+        val typeQuery = if (isExpense) "($TYPE_COL = '支出' OR $TYPE_COL = 'Expense')" else "($TYPE_COL = '收入' OR $TYPE_COL = 'Income')"
+
+        // 構建查詢語句：如果是年/月模式用 LIKE，如果是區間模式用 >= 和 <=
+        val dateCondition = if (isLikeQuery) "$DATE_COL LIKE ?" else "$DATE_COL >= ? AND $DATE_COL <= ?"
+        val args = if (isLikeQuery) {
+            arrayOf(userId.toString(), categoryKey, startDate) // startDate 這裡會是 "yyyy/MM%" 或 "yyyy/%"
+        } else {
+            arrayOf(userId.toString(), categoryKey, startDate, endDate)
+        }
+
+        val cursor = db.rawQuery(
+            "SELECT * FROM $TABLE_NAME " +
+                    "WHERE $TR_USER_ID_COL = ? AND $CATEGORY_KEY_COL = ? AND $typeQuery AND $dateCondition " +
+                    "ORDER BY $DATE_COL DESC, $ID_COL DESC",
+            args
+        )
+
+        if (cursor.moveToFirst()) {
+            do {
+                list.add(
+                    Transaction(
+                        id = cursor.getLong(0),
+                        date = cursor.getString(2),
+                        day = cursor.getString(3),
+                        title = cursor.getString(4),
+                        amount = cursor.getInt(5),
+                        type = cursor.getString(6),
+                        categoryKey = cursor.getString(7)
+                    )
+                )
             } while (cursor.moveToNext())
         }
         cursor.close()

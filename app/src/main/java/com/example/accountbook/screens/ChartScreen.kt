@@ -51,7 +51,8 @@ val DashBlue = Color(0xFF7CB9E8)
 fun ChartScreen(
     vm: TransactionViewModel,
     onBack: () -> Unit,
-    onOpenDrawer: () -> Unit
+    onOpenDrawer: () -> Unit,
+    onCategoryClick: (String) -> Unit // ★ 新增：當點擊分類時的 Callback
 ) {
     // 監聽年份、月份、Tab、模式、自訂日期變化，重新載入資料
     LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab, vm.chartTimeMode, vm.customStartDateMillis, vm.customEndDateMillis) {
@@ -136,8 +137,8 @@ fun ChartScreen(
                 // 3. 交易類型 (甜甜圈圖 + 圖例)
                 TypeAnalysisCard(vm)
 
-                // 4. 明細列表
-                DetailListCard(vm)
+                // 4. 明細列表 (★ 傳入 onCategoryClick)
+                DetailListCard(vm, onCategoryClick)
 
                 Spacer(Modifier.height(40.dp))
             }
@@ -564,7 +565,7 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
 }
 
 @Composable
-fun DetailListCard(vm: TransactionViewModel) {
+fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) {
     val stats = vm.monthlyCategoryStats
     val colors = listOf(ChartBlue, ChartGreen, ChartPink, ChartYellow, Color(0xFFBA68C8), Color(0xFFFF8A65))
     val isExpense = vm.chartTab == 0
@@ -583,9 +584,11 @@ fun DetailListCard(vm: TransactionViewModel) {
                 stats.forEachIndexed { index, item ->
                     val color = colors[index % colors.size]
 
+                    // ★ 修改：加入 clickable 來觸發導航
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            .clickable { onCategoryClick(item.key) }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

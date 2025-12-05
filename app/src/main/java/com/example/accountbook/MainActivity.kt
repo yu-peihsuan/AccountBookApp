@@ -97,12 +97,33 @@ fun AccountBookApp() {
                 )
             }
 
-            // ★ 修正：ChartScreen 的參數傳遞
+            // ★ 修改：ChartScreen 加入 onCategoryClick
             composable("chart") {
                 ChartScreen(
                     vm = vm,
-                    onBack = { navController.popBackStack() }, // 這個給 onBack
-                    onOpenDrawer = { scope.launch { drawerState.open() } } // 這個給 Drawer
+                    onBack = { navController.popBackStack() },
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onCategoryClick = { categoryKey ->
+                        // 導航到詳細頁面，帶上分類 Key
+                        navController.navigate("category_detail/$categoryKey")
+                    }
+                )
+            }
+
+            // ★ 新增：分類詳細頁面
+            composable(
+                route = "category_detail/{categoryKey}",
+                arguments = listOf(navArgument("categoryKey") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val key = backStackEntry.arguments?.getString("categoryKey") ?: "other"
+                CategoryDetailScreen(
+                    vm = vm,
+                    categoryKey = key,
+                    onBack = { navController.popBackStack() },
+                    onEditTransaction = { id ->
+                        // 點擊詳細頁面的項目，也可以導航去編輯
+                        navController.navigate("add?id=$id")
+                    }
                 )
             }
 

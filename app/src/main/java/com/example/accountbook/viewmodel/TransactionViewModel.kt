@@ -564,6 +564,34 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    // ★★★ 新增：給分類詳細頁面呼叫，獲取該分類在目前圖表時間範圍內的交易 ★★★
+    fun getTransactionsForCategoryDetail(categoryKey: String): List<Transaction> {
+        if (currentUserId == -1) return emptyList()
+
+        val typeFilter = if (chartTab == 1) "收入" else "支出"
+        var startDate = ""
+        var endDate = ""
+        var isLikeQuery = false
+
+        if (chartTimeMode == 1) {
+            // 年模式
+            startDate = "$chartYear/%"
+            isLikeQuery = true
+        } else if (chartTimeMode == 2) {
+            // 自訂模式
+            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+            startDate = sdf.format(Date(customStartDateMillis))
+            endDate = sdf.format(Date(customEndDateMillis))
+            isLikeQuery = false
+        } else {
+            // 月模式
+            startDate = String.format("%04d/%02d", chartYear, chartMonth) + "%"
+            isLikeQuery = true
+        }
+
+        return dbHandler.getCategoryTransactions(currentUserId, categoryKey, startDate, endDate, typeFilter, isLikeQuery)
+    }
+
     private fun getDaysInMonth(year: Int, month: Int): Int {
         val cal = Calendar.getInstance()
         cal.set(year, month - 1, 1)
