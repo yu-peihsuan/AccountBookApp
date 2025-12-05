@@ -47,14 +47,40 @@ val TextDark = Color(0xFF4A463F)
 val BorderGray = Color(0xFFE0E0E0)
 val DashBlue = Color(0xFF7CB9E8)
 
+// ★ 修改：加入新類別的顏色
+fun getCategoryColor(key: String): Color {
+    return when (key) {
+        // 支出
+        "breakfast" -> Color(0xFFEAC45D)
+        "lunch" -> Color(0xFFFFB74D)
+        "dinner" -> Color(0xFFFF8A65)
+        "drink" -> Color(0xFF4DD0E1)
+        "snack" -> Color(0xFFFFD180)    // 點心
+        "traffic" -> Color(0xFF64B5F6)
+        "shopping" -> Color(0xFFF06292)
+        "daily" -> Color(0xFF81C784)
+        "entertainment" -> Color(0xFFBA68C8)
+        "rent" -> Color(0xFF7986CB)
+        "bills" -> Color(0xFFFFD54F)
+        "other" -> Color(0xFFA1887F)
+
+        // 收入
+        "salary" -> Color(0xFF4DB6AC)   // 薪水 (Teal)
+        "bonus" -> Color(0xFFE57373)    // 獎金 (Red/Pink)
+        "rewards" -> Color(0xFF9575CD)  // 回饋 (Deep Purple)
+
+        "add" -> Color.LightGray
+        else -> Color.Gray
+    }
+}
+
 @Composable
 fun ChartScreen(
     vm: TransactionViewModel,
     onBack: () -> Unit,
     onOpenDrawer: () -> Unit,
-    onCategoryClick: (String) -> Unit // 當點擊分類時的 Callback
+    onCategoryClick: (String) -> Unit
 ) {
-    // 監聽年份、月份、Tab、模式、自訂日期變化，重新載入資料
     LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab, vm.chartTimeMode, vm.customStartDateMillis, vm.customEndDateMillis) {
         vm.loadMonthlyChartData()
     }
@@ -68,7 +94,6 @@ fun ChartScreen(
                         .fillMaxWidth()
                         .padding(top = 16.dp, bottom = 16.dp)
                 ) {
-                    // 左側 Menu Icon
                     IconButton(
                         onClick = onOpenDrawer,
                         modifier = Modifier
@@ -78,7 +103,6 @@ fun ChartScreen(
                         Icon(Icons.Default.Menu, null, tint = TextDark)
                     }
 
-                    // 中間 Segmented Toggle (支出 / 收入 / 結餘)
                     Row(
                         Modifier
                             .align(Alignment.Center)
@@ -117,12 +141,8 @@ fun ChartScreen(
                 .background(BodyBgColor),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Spacer(Modifier.height(16.dp))
-
-            // 1. 時間篩選器
             TimeFilterSection(vm)
-
             Spacer(Modifier.height(24.dp))
 
             Column(
@@ -131,34 +151,24 @@ fun ChartScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // 2. 趨勢圖卡片 (根據 Tab 決定畫哪種圖)
                 DailyTrendCard(vm)
-
-                // 3. 交易類型 (甜甜圈圖 + 圖例)
                 TypeAnalysisCard(vm)
-
-                // 4. 明細列表 (傳入 onCategoryClick)
                 DetailListCard(vm, onCategoryClick)
-
                 Spacer(Modifier.height(40.dp))
             }
         }
     }
 }
 
-// --- 元件: 時間篩選區塊 ---
 @Composable
 fun TimeFilterSection(vm: TransactionViewModel) {
     var showMonthPicker by remember { mutableStateOf(false) }
-
-    // 控制日期選擇器的顯示 (0:無, 1:起始日期, 2:結束日期)
     var datePickerState by remember { mutableIntStateOf(0) }
 
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // (A) 月 / 年 / 自訂 膠囊按鈕
         Row(
             Modifier
                 .width(300.dp)
@@ -169,7 +179,6 @@ fun TimeFilterSection(vm: TransactionViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             val filters = listOf("月", "年", "自訂")
-
             filters.forEachIndexed { index, text ->
                 val isSelected = vm.chartTimeMode == index
                 Box(
@@ -190,9 +199,7 @@ fun TimeFilterSection(vm: TransactionViewModel) {
 
         Spacer(Modifier.height(16.dp))
 
-        // (B) 日期顯示區
         if (vm.chartTimeMode == 2) {
-            // === 自訂模式：顯示兩個日期框與快速按鈕 ===
             val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
             val startStr = sdf.format(Date(vm.customStartDateMillis))
             val endStr = sdf.format(Date(vm.customEndDateMillis))
@@ -209,7 +216,6 @@ fun TimeFilterSection(vm: TransactionViewModel) {
 
             Spacer(Modifier.height(12.dp))
 
-            // 快速選擇按鈕
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickChip("近7天") { vm.applyQuickRange("7days") }
                 QuickChip("近30天") { vm.applyQuickRange("30days") }
@@ -217,13 +223,11 @@ fun TimeFilterSection(vm: TransactionViewModel) {
             }
 
         } else {
-            // === 月/年模式：顯示左右箭頭與日期 ===
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // 左箭頭
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     IconButton(onClick = {
                         if (vm.chartTimeMode == 1) {
@@ -241,7 +245,6 @@ fun TimeFilterSection(vm: TransactionViewModel) {
                     }
                 }
 
-                // 中間日期文字 (可點擊開啟滾動式選擇器)
                 val displayDate = if (vm.chartTimeMode == 1) {
                     "${vm.chartYear}年"
                 } else {
@@ -262,7 +265,6 @@ fun TimeFilterSection(vm: TransactionViewModel) {
                     )
                 }
 
-                // 右箭頭
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     IconButton(onClick = {
                         if (vm.chartTimeMode == 1) {
@@ -283,7 +285,6 @@ fun TimeFilterSection(vm: TransactionViewModel) {
         }
     }
 
-    // 滾動式月份選擇器 Dialog
     if (showMonthPicker) {
         MonthPickerDialog(
             year = vm.chartYear,
@@ -298,7 +299,6 @@ fun TimeFilterSection(vm: TransactionViewModel) {
         )
     }
 
-    // 單一日期選擇器 (用於自訂起始與結束日期)
     if (datePickerState != 0) {
         val initialDate = if (datePickerState == 1) vm.customStartDateMillis else vm.customEndDateMillis
         val dateState = rememberDatePickerState(initialSelectedDateMillis = initialDate)
@@ -367,7 +367,7 @@ fun QuickChip(text: String, onClick: () -> Unit) {
 fun DailyTrendCard(vm: TransactionViewModel) {
     val isYearMode = vm.chartTimeMode == 1
     val isCustomMode = vm.chartTimeMode == 2
-    val isBalanceMode = vm.chartTab == 2 // 是否為結餘模式
+    val isBalanceMode = vm.chartTab == 2
 
     val title = when {
         isYearMode -> "每月趨勢"
@@ -397,17 +397,14 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                 .height(240.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
-                // 標頭資訊
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isBalanceMode) {
-                        // 結餘模式顯示總結餘
                         Text(
                             "總結餘 : ${vm.currency}${vm.monthlyTotal}",
                             color = if(vm.monthlyTotal>=0) ChartBlue else ChartPink,
                             fontSize = 14.sp, fontWeight = FontWeight.Bold
                         )
                     } else {
-                        // 支出/收入模式顯示虛線平均值
                         Box(Modifier.size(12.dp, 3.dp).background(DashBlue))
                         Spacer(Modifier.width(8.dp))
                         Text(
@@ -429,10 +426,8 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                     }
                 } else {
                     if (isBalanceMode) {
-                        // ★★★ 結餘模式：繪製正負長條圖 (Diverging Bar Chart) ★★★
                         DrawDivergingBarChart(dataPoints, vm.currency)
                     } else {
-                        // ★★★ 支出/收入模式：繪製一般長條圖 ★★★
                         DrawBarChart(dataPoints, vm.averageDaily, vm.currency)
                     }
                 }
@@ -441,7 +436,6 @@ fun DailyTrendCard(vm: TransactionViewModel) {
     }
 }
 
-// ---------------- 繪製一般長條圖 (支出/收入) ----------------
 @Composable
 fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: String) {
     Canvas(Modifier.fillMaxSize()) {
@@ -454,7 +448,6 @@ fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: St
 
         val maxVal = (dataPoints.maxOfOrNull { it.second } ?: 1).coerceAtLeast(average * 2).toFloat()
 
-        // 畫平均線
         val avgY = chartHeight - (average / maxVal * chartHeight)
         if (avgY >= 0) {
             drawLine(
@@ -466,7 +459,6 @@ fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: St
             )
         }
 
-        // 畫底線
         drawLine(
             color = ChartYellow,
             start = Offset(0f, chartHeight),
@@ -474,7 +466,6 @@ fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: St
             strokeWidth = 3f
         )
 
-        // 畫長條
         dataPoints.forEachIndexed { i, (label, amount) ->
             val cx = i * spacing + spacing / 2
             val x = cx - barWidth / 2
@@ -490,7 +481,6 @@ fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: St
                 )
             }
 
-            // 畫 X 軸文字
             val step = when {
                 count <= 12 -> 1
                 count <= 31 -> 2
@@ -511,7 +501,6 @@ fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: St
     }
 }
 
-// ---------------- 繪製正負長條圖 (結餘) ----------------
 @Composable
 fun DrawDivergingBarChart(dataPoints: List<Pair<String, Int>>, currency: String) {
     Canvas(Modifier.fillMaxSize()) {
@@ -524,18 +513,14 @@ fun DrawDivergingBarChart(dataPoints: List<Pair<String, Int>>, currency: String)
         val maxVal = dataPoints.maxOfOrNull { it.second }?.toFloat() ?: 0f
         val minVal = dataPoints.minOfOrNull { it.second }?.toFloat() ?: 0f
 
-        // 計算總範圍 (讓 0 軸可以動態定位)
         val totalRange = maxVal - minVal
 
-        // 決定 0 軸的 Y 座標
-        // 0 軸距離頂部的距離 = (最大值 / 總範圍) * 高度
         val zeroY = if (totalRange == 0f) {
             chartHeight / 2
         } else {
             (maxVal / totalRange) * chartHeight
         }
 
-        // 畫 0 軸基準線 (灰色)
         drawLine(
             color = Color.Gray,
             start = Offset(0f, zeroY),
@@ -550,17 +535,14 @@ fun DrawDivergingBarChart(dataPoints: List<Pair<String, Int>>, currency: String)
             val cx = i * spacing + spacing / 2
             val x = cx - barWidth / 2
 
-            // 計算長條的高度 (絕對值)
             val barHeight = if (totalRange == 0f) 0f else (kotlin.math.abs(amount) / totalRange) * chartHeight
 
-            // 決定顏色：正數用藍，負數用紅
             val barColor = if (amount >= 0) ChartBlue else ChartPink
 
-            // 決定長條的起點和終點
             val topLeftY = if (amount >= 0) {
-                zeroY - barHeight // 正數往上長
+                zeroY - barHeight
             } else {
-                zeroY // 負數往下長
+                zeroY
             }
 
             if (barHeight > 0) {
@@ -571,7 +553,6 @@ fun DrawDivergingBarChart(dataPoints: List<Pair<String, Int>>, currency: String)
                 )
             }
 
-            // 畫 X 軸文字
             val step = when {
                 count <= 12 -> 1
                 count <= 31 -> 3
@@ -595,12 +576,10 @@ fun DrawDivergingBarChart(dataPoints: List<Pair<String, Int>>, currency: String)
 @Composable
 fun TypeAnalysisCard(vm: TransactionViewModel) {
     val stats = vm.monthlyCategoryStats
-    val colors = listOf(ChartBlue, ChartGreen, ChartPink, ChartYellow, Color(0xFFBA68C8), Color(0xFFFF8A65))
     val total = vm.monthlyTotal
 
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // 結餘模式顯示不同標題
             val title = if (vm.chartTab == 2) "  支出佔比 (結餘模式)" else "  交易類型"
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
         }
@@ -620,13 +599,14 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
                 if (stats.isEmpty()) {
                     drawCircle(Color.LightGray, style = Stroke(strokeWidth))
                 } else {
-                    // 計算分母：如果是結餘模式，total 可能是結餘總額，這裡我們需要用 stats 的加總
                     val pieTotal = if (vm.chartTab == 2) stats.sumOf { it.totalAmount } else total
 
-                    stats.forEachIndexed { index, stat ->
+                    stats.forEach { stat ->
                         val sweep = if(pieTotal > 0) (stat.totalAmount.toFloat() / pieTotal) * 360f else 0f
+                        val color = getCategoryColor(stat.key)
+
                         drawArc(
-                            color = colors[index % colors.size],
+                            color = color,
                             startAngle = startAngle,
                             sweepAngle = sweep,
                             useCenter = false,
@@ -660,14 +640,15 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
                 stats.chunked(2).forEachIndexed { i, rowItems ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         rowItems.forEach { item ->
-                            val colorIndex = stats.indexOf(item) % colors.size
+                            val color = getCategoryColor(item.key)
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(vertical = 8.dp)
                             ) {
-                                Box(Modifier.size(12.dp).background(colors[colorIndex]))
+                                Box(Modifier.size(12.dp).background(color))
                                 Spacer(Modifier.width(12.dp))
                                 Text(vm.getCategoryName(item.key), fontSize = 14.sp, color = TextDark)
                                 Text(
@@ -689,7 +670,6 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
 @Composable
 fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) {
     val stats = vm.monthlyCategoryStats
-    val colors = listOf(ChartBlue, ChartGreen, ChartPink, ChartYellow, Color(0xFFBA68C8), Color(0xFFFF8A65))
     val isExpense = vm.chartTab == 0
     val isBalance = vm.chartTab == 2
 
@@ -710,12 +690,12 @@ fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) 
         ) {
             Column {
                 stats.forEachIndexed { index, item ->
-                    val color = colors[index % colors.size]
+                    val color = getCategoryColor(item.key)
 
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onCategoryClick(item.key) } // 點擊觸發導航
+                            .clickable { onCategoryClick(item.key) }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -726,7 +706,6 @@ fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) 
                         Text("(${item.count}筆)", fontSize = 12.sp, color = Color.Gray)
                         Spacer(Modifier.weight(1f))
 
-                        // 結餘模式下的明細也是支出，所以加負號
                         val sign = if (isExpense || isBalance) "-" else ""
                         Text(
                             "$sign${vm.currency}${item.totalAmount}",

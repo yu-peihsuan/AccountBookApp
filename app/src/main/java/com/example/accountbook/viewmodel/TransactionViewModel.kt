@@ -44,10 +44,12 @@ interface StringResources {
     val btnDone: String
     val btnConfirm: String
     val btnCancel: String
+    // Expense Categories
     val categoryBreakfast: String
     val categoryLunch: String
     val categoryDinner: String
     val categoryDrink: String
+    val categorySnack: String // ★ 新增
     val categoryTraffic: String
     val categoryShopping: String
     val categoryDaily: String
@@ -55,6 +57,11 @@ interface StringResources {
     val categoryRent: String
     val categoryBills: String
     val categoryOther: String
+    // Income Categories
+    val categorySalary: String // ★ 新增
+    val categoryBonus: String // ★ 新增
+    val categoryRewards: String // ★ 新增
+
     val categoryAdd: String
     val settingTitle: String
     val sectionAccount: String
@@ -102,10 +109,12 @@ object StringsZH : StringResources {
     override val btnDone = "完成"
     override val btnConfirm = "確定"
     override val btnCancel = "取消"
+    // Expense
     override val categoryBreakfast = "早餐"
     override val categoryLunch = "午餐"
     override val categoryDinner = "晚餐"
     override val categoryDrink = "飲料"
+    override val categorySnack = "點心" // ★
     override val categoryTraffic = "交通"
     override val categoryShopping = "購物"
     override val categoryDaily = "日用品"
@@ -113,6 +122,11 @@ object StringsZH : StringResources {
     override val categoryRent = "房租"
     override val categoryBills = "生活繳費"
     override val categoryOther = "其他"
+    // Income
+    override val categorySalary = "薪水" // ★
+    override val categoryBonus = "獎金" // ★
+    override val categoryRewards = "回饋" // ★
+
     override val categoryAdd = "新增分類"
     override val settingTitle = "設定"
     override val sectionAccount = "帳號管理"
@@ -160,10 +174,12 @@ object StringsEN : StringResources {
     override val btnDone = "Done"
     override val btnConfirm = "OK"
     override val btnCancel = "Cancel"
+    // Expense
     override val categoryBreakfast = "Breakfast"
     override val categoryLunch = "Lunch"
     override val categoryDinner = "Dinner"
     override val categoryDrink = "Drink"
+    override val categorySnack = "Snack" // ★
     override val categoryTraffic = "Traffic"
     override val categoryShopping = "Shopping"
     override val categoryDaily = "Daily"
@@ -171,6 +187,11 @@ object StringsEN : StringResources {
     override val categoryRent = "Rent"
     override val categoryBills = "Bills"
     override val categoryOther = "Other"
+    // Income
+    override val categorySalary = "Salary" // ★
+    override val categoryBonus = "Bonus" // ★
+    override val categoryRewards = "Rewards" // ★
+
     override val categoryAdd = "Add"
     override val settingTitle = "Settings"
     override val sectionAccount = "Account"
@@ -192,6 +213,8 @@ object StringsEN : StringResources {
 }
 
 // ---------------- ViewModel ----------------
+
+data class CustomCategory(val name: String, val key: String)
 
 data class Transaction(
     val id: Long = 0,
@@ -239,33 +262,23 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val _transactions = mutableStateListOf<Transaction>()
     val transactions: List<Transaction> get() = _transactions
 
+    var customCategories = mutableStateListOf<CustomCategory>()
+        private set
+
     // --- Chart Screen States ---
     var chartYear by mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
     var chartMonth by mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1)
-
-    // Tab: 0=支出, 1=收入, 2=結餘
     var chartTab by mutableIntStateOf(0)
-
-    // 時間模式 0=月, 1=年, 2=自訂
     var chartTimeMode by mutableIntStateOf(0)
-
-    // 自訂模式的起訖日期 (Milliseconds)
     var customStartDateMillis by mutableLongStateOf(System.currentTimeMillis())
     var customEndDateMillis by mutableLongStateOf(System.currentTimeMillis())
 
-    // 通用的圖表資料點
     var chartDataPoints by mutableStateOf<List<Pair<String, Int>>>(emptyList())
         private set
-
-    // 平均
     var averageDaily by mutableIntStateOf(0)
         private set
-
-    // 分類統計列表
     var monthlyCategoryStats by mutableStateOf<List<CategoryStat>>(emptyList())
         private set
-
-    // 總金額 (或總結餘)
     var monthlyTotal by mutableIntStateOf(0)
         private set
 
@@ -280,13 +293,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         checkLoginStatus()
         loadData()
 
-        // 初始化自訂日期為本月第一天到今天
         val c = Calendar.getInstance()
         c.set(Calendar.DAY_OF_MONTH, 1)
         customStartDateMillis = c.timeInMillis
     }
 
-    // ★ 快速設定區間
     fun applyQuickRange(rangeType: String) {
         val calendar = Calendar.getInstance()
         val today = System.currentTimeMillis()
@@ -312,12 +323,16 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun getCategoryName(key: String): String {
+        val custom = customCategories.find { it.key == key }
+        if (custom != null) return custom.name
+
         val s = currentStrings
         return when (key) {
             "breakfast" -> s.categoryBreakfast
             "lunch" -> s.categoryLunch
             "dinner" -> s.categoryDinner
             "drink" -> s.categoryDrink
+            "snack" -> s.categorySnack // ★
             "traffic" -> s.categoryTraffic
             "shopping" -> s.categoryShopping
             "daily" -> s.categoryDaily
@@ -325,8 +340,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             "rent" -> s.categoryRent
             "bills" -> s.categoryBills
             "other" -> s.categoryOther
+            "salary" -> s.categorySalary // ★
+            "bonus" -> s.categoryBonus // ★
+            "rewards" -> s.categoryRewards // ★
             "add" -> s.categoryAdd
-            else -> ""
+            else -> key
         }
     }
 
@@ -349,6 +367,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             userEmail = email
             isLoggedIn = true
             _transactions.clear()
+            loadCategories()
             return ""
         } else {
             return "註冊失敗，資料庫錯誤"
@@ -401,6 +420,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         userEmail = ""
         currentUserId = -1
         _transactions.clear()
+        customCategories.clear()
     }
 
     fun updateBudget(newBudget: Int) {
@@ -416,6 +436,23 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun updateLanguage(newLang: String) {
         language = newLang
         prefs.edit().putString("app_language", newLang).apply()
+    }
+
+    fun loadCategories() {
+        if (currentUserId == -1) return
+        val list = dbHandler.getCategories(currentUserId)
+        customCategories.clear()
+        list.forEach {
+            customCategories.add(CustomCategory(it.first, it.second))
+        }
+    }
+
+    fun addCustomCategory(name: String): String {
+        if (currentUserId == -1) return ""
+        val key = "custom_${System.currentTimeMillis()}"
+        dbHandler.addCategory(currentUserId, name, key)
+        loadCategories()
+        return key
     }
 
     fun addTransaction(title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
@@ -467,6 +504,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun loadData() {
         if (currentUserId != -1) {
+            loadCategories()
+
             val list = dbHandler.getAllTransactions(currentUserId)
             _transactions.clear()
             _transactions.addAll(list)
@@ -478,7 +517,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 載入圖表頁面的詳細數據 (根據 chartTimeMode 切換月/年/自訂)
     fun loadMonthlyChartData() {
         if (currentUserId == -1) return
 
@@ -487,13 +525,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         var rawCategoryStats: List<Triple<String, Int, Int>> = emptyList()
 
         if (chartTab == 2) {
-            // ================== 結餘模式 (Balance) ==================
-            // 計算：收入 - 支出
             if (chartTimeMode == 1) {
-                // --- 年模式 ---
                 val inc = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, "收入")
                 val exp = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, "支出")
-
                 for (m in 1..12) {
                     val iVal = inc[m] ?: 0
                     val eVal = exp[m] ?: 0
@@ -502,21 +536,16 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     totalSum += balance
                 }
                 rawCategoryStats = dbHandler.getYearlyCategoryStats(currentUserId, chartYear, "支出")
-
             } else if (chartTimeMode == 2) {
-                // --- 自訂區間 ---
                 val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
                 val startStr = sdf.format(Date(customStartDateMillis))
                 val endStr = sdf.format(Date(customEndDateMillis))
-
                 val inc = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, "收入")
                 val exp = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, "支出")
-
                 val diff = customEndDateMillis - customStartDateMillis
                 val daysCount = (diff / (1000 * 60 * 60 * 24)).toInt() + 1
                 val cal = Calendar.getInstance()
                 cal.timeInMillis = customStartDateMillis
-
                 if (daysCount > 60) {
                     val sortedKeys = (inc.keys + exp.keys).sorted()
                     for (dateKey in sortedKeys) {
@@ -538,13 +567,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 }
                 rawCategoryStats = dbHandler.getRangeCategoryStats(currentUserId, startStr, endStr, "支出")
-
             } else {
-                // --- 月模式 ---
                 val inc = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, "收入")
                 val exp = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, "支出")
                 val daysInMonth = getDaysInMonth(chartYear, chartMonth)
-
                 for (d in 1..daysInMonth) {
                     val iVal = inc[d] ?: 0
                     val eVal = exp[d] ?: 0
@@ -554,17 +580,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 rawCategoryStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, "支出")
             }
-
-            // 平均值 (結餘的平均)
             averageDaily = if (newChartData.isNotEmpty()) totalSum / newChartData.size else 0
-            monthlyTotal = totalSum // 這裡代表總結餘
-
+            monthlyTotal = totalSum
         } else {
-            // ================== 支出 / 收入模式 ==================
             val typeFilter = if (chartTab == 1) "收入" else "支出"
-
             if (chartTimeMode == 1) {
-                // === 年檢視模式 ===
                 val monthlyStats = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, typeFilter)
                 for (m in 1..12) {
                     val amount = monthlyStats[m] ?: 0
@@ -572,19 +592,15 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 totalSum = monthlyStats.values.sum()
                 rawCategoryStats = dbHandler.getYearlyCategoryStats(currentUserId, chartYear, typeFilter)
-
             } else if (chartTimeMode == 2) {
-                // === 自訂區間模式 ===
                 val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
                 val startStr = sdf.format(Date(customStartDateMillis))
                 val endStr = sdf.format(Date(customEndDateMillis))
                 val dailyStats = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, typeFilter)
-
                 val diff = customEndDateMillis - customStartDateMillis
                 val daysCount = (diff / (1000 * 60 * 60 * 24)).toInt() + 1
                 val cal = Calendar.getInstance()
                 cal.timeInMillis = customStartDateMillis
-
                 if (daysCount > 60) {
                     val sortedKeys = dailyStats.keys.sorted()
                     for (dateKey in sortedKeys) {
@@ -602,9 +618,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 totalSum = dailyStats.values.sum()
                 rawCategoryStats = dbHandler.getRangeCategoryStats(currentUserId, startStr, endStr, typeFilter)
-
             } else {
-                // === 月檢視模式 ===
                 val monthlyStats = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, typeFilter)
                 val daysInMonth = getDaysInMonth(chartYear, chartMonth)
                 for (d in 1..daysInMonth) {
@@ -614,14 +628,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 totalSum = monthlyStats.values.sum()
                 rawCategoryStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, typeFilter)
             }
-
             monthlyTotal = totalSum
             averageDaily = if (newChartData.isNotEmpty()) totalSum / newChartData.size else 0
         }
-
         chartDataPoints = newChartData
-
-        // 更新分類佔比
         val statsTotal = rawCategoryStats.sumOf { it.second }
         monthlyCategoryStats = rawCategoryStats.map { (key, sum, count) ->
             val pct = if (statsTotal > 0) (sum.toFloat() / statsTotal) * 100 else 0f
@@ -629,17 +639,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★★★ 取得特定分類在指定範圍內的詳細交易列表 (用於點擊跳轉) ★★★
     fun getTransactionsForCategoryDetail(categoryKey: String): List<Transaction> {
         if (currentUserId == -1) return emptyList()
-
-        // 注意：如果是結餘模式，下方的列表顯示的是「支出」分類，所以這裡 filter 要設為支出
         val typeFilter = if (chartTab == 1) "收入" else "支出"
-
         var startDate = ""
         var endDate = ""
         var isLikeQuery = false
-
         if (chartTimeMode == 1) {
             startDate = "$chartYear/%"
             isLikeQuery = true
@@ -652,7 +657,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             startDate = String.format("%04d/%02d", chartYear, chartMonth) + "%"
             isLikeQuery = true
         }
-
         return dbHandler.getCategoryTransactions(currentUserId, categoryKey, startDate, endDate, typeFilter, isLikeQuery)
     }
 

@@ -13,7 +13,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
 
     companion object {
         private const val DB_NAME = "accountbook_db"
-        private const val DB_VERSION = 3
+        private const val DB_VERSION = 4 // ★ 版本升級為 4
 
         private const val TABLE_NAME = "transactions"
         private const val ID_COL = "id"
@@ -30,6 +30,13 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         private const val USER_NAME_COL = "name"
         private const val USER_EMAIL_COL = "email"
         private const val USER_PASS_COL = "password"
+
+        // ★ 新增：類別資料表
+        private const val TABLE_CATEGORIES = "categories"
+        private const val CAT_ID_COL = "id"
+        private const val CAT_USER_ID_COL = "user_id"
+        private const val CAT_NAME_COL = "name"
+        private const val CAT_KEY_COL = "key"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -50,14 +57,25 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
                 + USER_EMAIL_COL + " TEXT,"
                 + USER_PASS_COL + " TEXT)")
         db.execSQL(queryUsers)
+
+        // ★ 建立類別資料表
+        val queryCategories = ("CREATE TABLE " + TABLE_CATEGORIES + " ("
+                + CAT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + CAT_USER_ID_COL + " INTEGER,"
+                + CAT_NAME_COL + " TEXT,"
+                + CAT_KEY_COL + " TEXT)")
+        db.execSQL(queryCategories)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // 注意：這裡為了開發方便會清除舊資料，正式版建議改用 ALTER TABLE
         db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_CATEGORIES")
         onCreate(db)
     }
 
+    // --- User Methods ---
     fun checkUserExists(name: String): Boolean {
         val db = this.readableDatabase
         val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE $USER_NAME_COL = ?", arrayOf(name))
@@ -101,6 +119,33 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return userInfo
     }
 
+    // --- Category Methods (New) ---
+    fun addCategory(userId: Int, name: String, key: String) {
+        val db = this.writableDatabase
+        val values = ContentValues()
+        values.put(CAT_USER_ID_COL, userId)
+        values.put(CAT_NAME_COL, name)
+        values.put(CAT_KEY_COL, key)
+        db.insert(TABLE_CATEGORIES, null, values)
+        db.close()
+    }
+
+    fun getCategories(userId: Int): List<Pair<String, String>> {
+        val list = ArrayList<Pair<String, String>>()
+        val db = this.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM $TABLE_CATEGORIES WHERE $CAT_USER_ID_COL = ?", arrayOf(userId.toString()))
+        if (cursor.moveToFirst()) {
+            do {
+                val name = cursor.getString(2) // name column index
+                val key = cursor.getString(3)  // key column index
+                list.add(Pair(name, key))
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return list
+    }
+
+    // --- Transaction Methods ---
     fun addTransaction(userId: Int, date: String, day: String, title: String, amount: Int, type: String, categoryKey: String) {
         val db = this.writableDatabase
         val values = ContentValues()

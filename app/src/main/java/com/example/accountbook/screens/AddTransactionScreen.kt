@@ -43,7 +43,7 @@ data class CategoryItem(val name: String, val icon: ImageVector, val key: String
 @Composable
 fun AddTransactionScreen(
     vm: TransactionViewModel,
-    transactionId: Long, // 接收傳入的 ID
+    transactionId: Long,
     onBack: () -> Unit
 ) {
     val strings = vm.currentStrings
@@ -54,13 +54,18 @@ fun AddTransactionScreen(
     val isEditMode = transactionId != -1L
 
     var type by remember { mutableStateOf(if(language=="English") "Expense" else "支出") }
-    var selectedCategoryKey by remember { mutableStateOf("rent") }
+    // 預設選擇
+    var selectedCategoryKey by remember { mutableStateOf("breakfast") }
     var amount by remember { mutableStateOf("0") }
     var note by remember { mutableStateOf("") }
     var dateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // 初始化載入資料 (如果是編輯模式)
+    // 新增類別相關 State
+    var showNewCategoryDialog by remember { mutableStateOf(false) }
+    var newCategoryName by remember { mutableStateOf("") }
+
+    // 初始化載入資料
     LaunchedEffect(transactionId) {
         if (isEditMode) {
             val tx = vm.getTransactionById(transactionId)
@@ -96,20 +101,41 @@ fun AddTransactionScreen(
         dateMillis = calendar.timeInMillis
     }
 
-    val categories = listOf(
+    // ★ 定義支出類別列表
+    val expenseCategories = listOf(
         CategoryItem(strings.categoryBreakfast, Icons.Filled.Star, "breakfast"),
         CategoryItem(strings.categoryLunch, Icons.Filled.Face, "lunch"),
         CategoryItem(strings.categoryDinner, Icons.Filled.Favorite, "dinner"),
         CategoryItem(strings.categoryDrink, Icons.Filled.CheckCircle, "drink"),
+        CategoryItem(strings.categorySnack, Icons.Filled.Face, "snack"), // 點心
         CategoryItem(strings.categoryTraffic, Icons.Filled.Share, "traffic"),
         CategoryItem(strings.categoryShopping, Icons.Filled.ShoppingCart, "shopping"),
         CategoryItem(strings.categoryDaily, Icons.Filled.ThumbUp, "daily"),
-        CategoryItem(strings.categoryEntertainment, Icons.Filled.Face, "entertainment"),
         CategoryItem(strings.categoryRent, Icons.Filled.Home, "rent"),
+        CategoryItem(strings.categoryEntertainment, Icons.Filled.Face, "entertainment"),
         CategoryItem(strings.categoryBills, Icons.Filled.Warning, "bills"),
-        CategoryItem(strings.categoryOther, Icons.Filled.Menu, "other"),
-        CategoryItem(strings.categoryAdd, Icons.Filled.Add, "add")
+        CategoryItem(strings.categoryOther, Icons.Filled.Menu, "other")
     )
+
+    // ★ 定義收入類別列表
+    val incomeCategories = listOf(
+        CategoryItem(strings.categorySalary, Icons.Filled.ThumbUp, "salary"), // 薪水
+        CategoryItem(strings.categoryBonus, Icons.Filled.Star, "bonus"),     // 獎金
+        CategoryItem(strings.categoryRewards, Icons.Filled.Favorite, "rewards"), // 回饋
+        CategoryItem(strings.categoryOther, Icons.Filled.Menu, "other")
+    )
+
+    val customCategoryList = vm.customCategories.toList()
+
+    // ★ 根據目前的 type 切換顯示的列表
+    val displayCategories = remember(customCategoryList, strings, type) {
+        val baseList = if (type == "支出" || type == "Expense") expenseCategories else incomeCategories
+        val customItems = customCategoryList.map {
+            CategoryItem(it.name, Icons.Filled.Face, it.key)
+        }
+        // 在列表最後加上「新增」按鈕
+        baseList + customItems + CategoryItem(strings.categoryAdd, Icons.Filled.Add, "add")
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dateMillis)
@@ -127,6 +153,38 @@ fun AddTransactionScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    // 新增類別的 Dialog
+    if (showNewCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewCategoryDialog = false },
+            title = { Text(strings.categoryAdd) },
+            text = {
+                Column {
+                    Text("請輸入類別名稱", modifier = Modifier.padding(bottom = 8.dp))
+                    OutlinedTextField(
+                        value = newCategoryName,
+                        onValueChange = { newCategoryName = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newCategoryName.isNotBlank()) {
+                        val newKey = vm.addCustomCategory(newCategoryName)
+                        selectedCategoryKey = newKey
+                        newCategoryName = ""
+                        showNewCategoryDialog = false
+                    }
+                }) { Text(strings.btnConfirm) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewCategoryDialog = false }) { Text(strings.btnCancel) }
+            }
+        )
     }
 
     Scaffold(
@@ -147,10 +205,18 @@ fun AddTransactionScreen(
                 }
 
                 Box(Modifier.align(Alignment.Center)) {
-                    TypeSegmentedControl(type, strings) { type = it }
+                    // ★ 切換 Type 時，預設選取列表的第一個項目 (避免選取到不屬於該 Type 的 key)
+                    TypeSegmentedControl(type, strings) { newType ->
+                        type = newType
+                        // 切換時重置選擇，避免 Key 不存在
+                        if (newType == "支出" || newType == "Expense") {
+                            selectedCategoryKey = "breakfast"
+                        } else {
+                            selectedCategoryKey = "salary"
+                        }
+                    }
                 }
 
-                // 如果是編輯模式，顯示刪除按鈕
                 if (isEditMode) {
                     IconButton(
                         onClick = {
@@ -178,11 +244,17 @@ fun AddTransactionScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(categories) { item ->
+                items(displayCategories) { item ->
                     CategoryCell(
                         item = item,
                         isSelected = selectedCategoryKey == item.key,
-                        onClick = { selectedCategoryKey = item.key }
+                        onClick = {
+                            if (item.key == "add") {
+                                showNewCategoryDialog = true
+                            } else {
+                                selectedCategoryKey = item.key
+                            }
+                        }
                     )
                 }
             }
