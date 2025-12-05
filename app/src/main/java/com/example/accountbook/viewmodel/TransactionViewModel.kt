@@ -16,7 +16,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// ---------------- 多語系資源定義 (省略重複部分，保持完整結構) ----------------
+// ---------------- 多語系資源定義 ----------------
 interface StringResources {
     val loginTitle: String
     val registerTitle: String
@@ -243,7 +243,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var chartYear by mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
     var chartMonth by mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1)
 
-    // Tab: 0=支出, 1=收入
+    // Tab: 0=支出, 1=收入, 2=結餘
     var chartTab by mutableIntStateOf(0)
 
     // 時間模式 0=月, 1=年, 2=自訂
@@ -253,7 +253,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var customStartDateMillis by mutableLongStateOf(System.currentTimeMillis())
     var customEndDateMillis by mutableLongStateOf(System.currentTimeMillis())
 
-    // 通用的圖表資料點 (取代原本的 monthlyDailyStats)
+    // 通用的圖表資料點
     var chartDataPoints by mutableStateOf<List<Pair<String, Int>>>(emptyList())
         private set
 
@@ -265,7 +265,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var monthlyCategoryStats by mutableStateOf<List<CategoryStat>>(emptyList())
         private set
 
-    // 總金額
+    // 總金額 (或總結餘)
     var monthlyTotal by mutableIntStateOf(0)
         private set
 
@@ -482,109 +482,173 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun loadMonthlyChartData() {
         if (currentUserId == -1) return
 
-        val typeFilter = if (chartTab == 1) "收入" else "支出"
-
         var newChartData = mutableListOf<Pair<String, Int>>()
         var totalSum = 0
         var rawCategoryStats: List<Triple<String, Int, Int>> = emptyList()
 
-        if (chartTimeMode == 1) {
-            // === 年檢視模式 ===
-            val monthlyStats = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, typeFilter)
+        if (chartTab == 2) {
+            // ================== 結餘模式 (Balance) ==================
+            // 計算：收入 - 支出
+            if (chartTimeMode == 1) {
+                // --- 年模式 ---
+                val inc = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, "收入")
+                val exp = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, "支出")
 
-            for (m in 1..12) {
-                val amount = monthlyStats[m] ?: 0
-                newChartData.add(Pair("$m", amount))
-            }
-
-            totalSum = monthlyStats.values.sum()
-            monthlyTotal = totalSum
-            averageDaily = if (totalSum > 0) totalSum / 12 else 0
-
-            rawCategoryStats = dbHandler.getYearlyCategoryStats(currentUserId, chartYear, typeFilter)
-
-        } else if (chartTimeMode == 2) {
-            // === 自訂區間模式 ===
-            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
-            val startStr = sdf.format(Date(customStartDateMillis))
-            val endStr = sdf.format(Date(customEndDateMillis))
-
-            val dailyStats = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, typeFilter)
-
-            val diff = customEndDateMillis - customStartDateMillis
-            val daysCount = (diff / (1000 * 60 * 60 * 24)).toInt() + 1
-
-            val cal = Calendar.getInstance()
-            cal.timeInMillis = customStartDateMillis
-
-            if (daysCount > 60) {
-                val sortedKeys = dailyStats.keys.sorted()
-                for (dateKey in sortedKeys) {
-                    val label = dateKey.substring(5)
-                    newChartData.add(Pair(label, dailyStats[dateKey] ?: 0))
+                for (m in 1..12) {
+                    val iVal = inc[m] ?: 0
+                    val eVal = exp[m] ?: 0
+                    val balance = iVal - eVal
+                    newChartData.add(Pair("$m", balance))
+                    totalSum += balance
                 }
+                rawCategoryStats = dbHandler.getYearlyCategoryStats(currentUserId, chartYear, "支出")
+
+            } else if (chartTimeMode == 2) {
+                // --- 自訂區間 ---
+                val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+                val startStr = sdf.format(Date(customStartDateMillis))
+                val endStr = sdf.format(Date(customEndDateMillis))
+
+                val inc = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, "收入")
+                val exp = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, "支出")
+
+                val diff = customEndDateMillis - customStartDateMillis
+                val daysCount = (diff / (1000 * 60 * 60 * 24)).toInt() + 1
+                val cal = Calendar.getInstance()
+                cal.timeInMillis = customStartDateMillis
+
+                if (daysCount > 60) {
+                    val sortedKeys = (inc.keys + exp.keys).sorted()
+                    for (dateKey in sortedKeys) {
+                        val label = dateKey.substring(5)
+                        val iVal = inc[dateKey] ?: 0
+                        val eVal = exp[dateKey] ?: 0
+                        newChartData.add(Pair(label, iVal - eVal))
+                        totalSum += (iVal - eVal)
+                    }
+                } else {
+                    for (i in 0 until daysCount) {
+                        val dateKey = sdf.format(cal.time)
+                        val label = dateKey.substring(5)
+                        val iVal = inc[dateKey] ?: 0
+                        val eVal = exp[dateKey] ?: 0
+                        newChartData.add(Pair(label, iVal - eVal))
+                        totalSum += (iVal - eVal)
+                        cal.add(Calendar.DAY_OF_YEAR, 1)
+                    }
+                }
+                rawCategoryStats = dbHandler.getRangeCategoryStats(currentUserId, startStr, endStr, "支出")
+
             } else {
-                for (i in 0 until daysCount) {
-                    val dateKey = sdf.format(cal.time)
-                    val label = dateKey.substring(5) // "MM/dd"
-                    val amount = dailyStats[dateKey] ?: 0
-                    newChartData.add(Pair(label, amount))
-                    cal.add(Calendar.DAY_OF_YEAR, 1)
+                // --- 月模式 ---
+                val inc = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, "收入")
+                val exp = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, "支出")
+                val daysInMonth = getDaysInMonth(chartYear, chartMonth)
+
+                for (d in 1..daysInMonth) {
+                    val iVal = inc[d] ?: 0
+                    val eVal = exp[d] ?: 0
+                    val balance = iVal - eVal
+                    newChartData.add(Pair("$d", balance))
+                    totalSum += balance
                 }
+                rawCategoryStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, "支出")
             }
 
-            totalSum = dailyStats.values.sum()
-            monthlyTotal = totalSum
-            averageDaily = if (daysCount > 0) totalSum / daysCount else 0
-
-            rawCategoryStats = dbHandler.getRangeCategoryStats(currentUserId, startStr, endStr, typeFilter)
+            // 平均值 (結餘的平均)
+            averageDaily = if (newChartData.isNotEmpty()) totalSum / newChartData.size else 0
+            monthlyTotal = totalSum // 這裡代表總結餘
 
         } else {
-            // === 月檢視模式 ===
-            val monthlyStats = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, typeFilter)
-            val daysInMonth = getDaysInMonth(chartYear, chartMonth)
+            // ================== 支出 / 收入模式 ==================
+            val typeFilter = if (chartTab == 1) "收入" else "支出"
 
-            for (d in 1..daysInMonth) {
-                val amount = monthlyStats[d] ?: 0
-                newChartData.add(Pair("$d", amount))
+            if (chartTimeMode == 1) {
+                // === 年檢視模式 ===
+                val monthlyStats = dbHandler.getYearlyMonthlyStats(currentUserId, chartYear, typeFilter)
+                for (m in 1..12) {
+                    val amount = monthlyStats[m] ?: 0
+                    newChartData.add(Pair("$m", amount))
+                }
+                totalSum = monthlyStats.values.sum()
+                rawCategoryStats = dbHandler.getYearlyCategoryStats(currentUserId, chartYear, typeFilter)
+
+            } else if (chartTimeMode == 2) {
+                // === 自訂區間模式 ===
+                val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+                val startStr = sdf.format(Date(customStartDateMillis))
+                val endStr = sdf.format(Date(customEndDateMillis))
+                val dailyStats = dbHandler.getRangeDailyStats(currentUserId, startStr, endStr, typeFilter)
+
+                val diff = customEndDateMillis - customStartDateMillis
+                val daysCount = (diff / (1000 * 60 * 60 * 24)).toInt() + 1
+                val cal = Calendar.getInstance()
+                cal.timeInMillis = customStartDateMillis
+
+                if (daysCount > 60) {
+                    val sortedKeys = dailyStats.keys.sorted()
+                    for (dateKey in sortedKeys) {
+                        val label = dateKey.substring(5)
+                        newChartData.add(Pair(label, dailyStats[dateKey] ?: 0))
+                    }
+                } else {
+                    for (i in 0 until daysCount) {
+                        val dateKey = sdf.format(cal.time)
+                        val label = dateKey.substring(5)
+                        val amount = dailyStats[dateKey] ?: 0
+                        newChartData.add(Pair(label, amount))
+                        cal.add(Calendar.DAY_OF_YEAR, 1)
+                    }
+                }
+                totalSum = dailyStats.values.sum()
+                rawCategoryStats = dbHandler.getRangeCategoryStats(currentUserId, startStr, endStr, typeFilter)
+
+            } else {
+                // === 月檢視模式 ===
+                val monthlyStats = dbHandler.getMonthlyDailyStats(currentUserId, chartYear, chartMonth, typeFilter)
+                val daysInMonth = getDaysInMonth(chartYear, chartMonth)
+                for (d in 1..daysInMonth) {
+                    val amount = monthlyStats[d] ?: 0
+                    newChartData.add(Pair("$d", amount))
+                }
+                totalSum = monthlyStats.values.sum()
+                rawCategoryStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, typeFilter)
             }
 
-            totalSum = monthlyStats.values.sum()
             monthlyTotal = totalSum
-            averageDaily = if (daysInMonth > 0) totalSum / daysInMonth else 0
-
-            rawCategoryStats = dbHandler.getMonthlyCategoryStats(currentUserId, chartYear, chartMonth, typeFilter)
+            averageDaily = if (newChartData.isNotEmpty()) totalSum / newChartData.size else 0
         }
 
         chartDataPoints = newChartData
 
+        // 更新分類佔比
+        val statsTotal = rawCategoryStats.sumOf { it.second }
         monthlyCategoryStats = rawCategoryStats.map { (key, sum, count) ->
-            val pct = if (totalSum > 0) (sum.toFloat() / totalSum) * 100 else 0f
+            val pct = if (statsTotal > 0) (sum.toFloat() / statsTotal) * 100 else 0f
             CategoryStat(key, sum, count, pct)
         }
     }
 
-    // ★★★ 新增：給分類詳細頁面呼叫，獲取該分類在目前圖表時間範圍內的交易 ★★★
+    // ★★★ 取得特定分類在指定範圍內的詳細交易列表 (用於點擊跳轉) ★★★
     fun getTransactionsForCategoryDetail(categoryKey: String): List<Transaction> {
         if (currentUserId == -1) return emptyList()
 
+        // 注意：如果是結餘模式，下方的列表顯示的是「支出」分類，所以這裡 filter 要設為支出
         val typeFilter = if (chartTab == 1) "收入" else "支出"
+
         var startDate = ""
         var endDate = ""
         var isLikeQuery = false
 
         if (chartTimeMode == 1) {
-            // 年模式
             startDate = "$chartYear/%"
             isLikeQuery = true
         } else if (chartTimeMode == 2) {
-            // 自訂模式
             val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
             startDate = sdf.format(Date(customStartDateMillis))
             endDate = sdf.format(Date(customEndDateMillis))
             isLikeQuery = false
         } else {
-            // 月模式
             startDate = String.format("%04d/%02d", chartYear, chartMonth) + "%"
             isLikeQuery = true
         }

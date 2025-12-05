@@ -52,7 +52,7 @@ fun ChartScreen(
     vm: TransactionViewModel,
     onBack: () -> Unit,
     onOpenDrawer: () -> Unit,
-    onCategoryClick: (String) -> Unit // ★ 新增：當點擊分類時的 Callback
+    onCategoryClick: (String) -> Unit // 當點擊分類時的 Callback
 ) {
     // 監聽年份、月份、Tab、模式、自訂日期變化，重新載入資料
     LaunchedEffect(vm.chartYear, vm.chartMonth, vm.chartTab, vm.chartTimeMode, vm.customStartDateMillis, vm.customEndDateMillis) {
@@ -131,13 +131,13 @@ fun ChartScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // 2. 趨勢圖卡片
+                // 2. 趨勢圖卡片 (根據 Tab 決定畫哪種圖)
                 DailyTrendCard(vm)
 
                 // 3. 交易類型 (甜甜圈圖 + 圖例)
                 TypeAnalysisCard(vm)
 
-                // 4. 明細列表 (★ 傳入 onCategoryClick)
+                // 4. 明細列表 (傳入 onCategoryClick)
                 DetailListCard(vm, onCategoryClick)
 
                 Spacer(Modifier.height(40.dp))
@@ -288,7 +288,7 @@ fun TimeFilterSection(vm: TransactionViewModel) {
         MonthPickerDialog(
             year = vm.chartYear,
             month = vm.chartMonth,
-            showMonth = (vm.chartTimeMode == 0), // ★ 如果是年模式(1)，不顯示月份
+            showMonth = (vm.chartTimeMode == 0),
             onDismiss = { showMonthPicker = false },
             onConfirm = { y, m ->
                 vm.chartYear = y
@@ -367,6 +367,7 @@ fun QuickChip(text: String, onClick: () -> Unit) {
 fun DailyTrendCard(vm: TransactionViewModel) {
     val isYearMode = vm.chartTimeMode == 1
     val isCustomMode = vm.chartTimeMode == 2
+    val isBalanceMode = vm.chartTab == 2 // 是否為結餘模式
 
     val title = when {
         isYearMode -> "每月趨勢"
@@ -396,14 +397,25 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                 .height(240.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
+                // 標頭資訊
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(12.dp, 3.dp).background(DashBlue))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "$avgLabel : ${if(vm.chartTab==0) "-" else ""}${vm.currency}${vm.averageDaily}",
-                        color = Color.Gray,
-                        fontSize = 14.sp
-                    )
+                    if (isBalanceMode) {
+                        // 結餘模式顯示總結餘
+                        Text(
+                            "總結餘 : ${vm.currency}${vm.monthlyTotal}",
+                            color = if(vm.monthlyTotal>=0) ChartBlue else ChartPink,
+                            fontSize = 14.sp, fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        // 支出/收入模式顯示虛線平均值
+                        Box(Modifier.size(12.dp, 3.dp).background(DashBlue))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "$avgLabel : ${if(vm.chartTab==0) "-" else ""}${vm.currency}${vm.averageDaily}",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -416,67 +428,165 @@ fun DailyTrendCard(vm: TransactionViewModel) {
                         Text("無資料", color = Color.Gray)
                     }
                 } else {
-                    Canvas(Modifier.fillMaxSize()) {
-                        val chartWidth = size.width
-                        val chartHeight = size.height - 40f
-
-                        val spacing = if (count > 1) chartWidth / (count) else 0f
-                        val barWidth = (spacing * 0.6f).coerceAtMost(30.dp.toPx()).coerceAtLeast(2.dp.toPx())
-
-                        val maxVal = (dataPoints.maxOfOrNull { it.second } ?: 1).coerceAtLeast(vm.averageDaily * 2).toFloat()
-
-                        val avgY = chartHeight - (vm.averageDaily / maxVal * chartHeight)
-                        if (avgY >= 0) {
-                            drawLine(
-                                color = DashBlue,
-                                start = Offset(0f, avgY),
-                                end = Offset(size.width, avgY),
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f)),
-                                strokeWidth = 3f
-                            )
-                        }
-
-                        drawLine(
-                            color = ChartYellow,
-                            start = Offset(0f, chartHeight),
-                            end = Offset(size.width, chartHeight),
-                            strokeWidth = 3f
-                        )
-
-                        dataPoints.forEachIndexed { i, (label, amount) ->
-                            val cx = i * spacing + spacing / 2
-                            val x = cx - barWidth / 2
-
-                            if (amount > 0) {
-                                val barHeight = (amount / maxVal) * chartHeight
-                                val y = chartHeight - barHeight
-
-                                drawRect(
-                                    color = ChartYellow,
-                                    topLeft = Offset(x, y),
-                                    size = Size(barWidth, barHeight)
-                                )
-                            }
-
-                            val step = when {
-                                count <= 12 -> 1
-                                count <= 31 -> 2
-                                else -> count / 10 + 1
-                            }
-
-                            if (i % step == 0) {
-                                val textPaint = android.graphics.Paint().apply {
-                                    color = android.graphics.Color.LTGRAY
-                                    textSize = 30f
-                                    textAlign = android.graphics.Paint.Align.CENTER
-                                }
-                                drawContext.canvas.nativeCanvas.drawText(
-                                    label, cx, size.height, textPaint
-                                )
-                            }
-                        }
+                    if (isBalanceMode) {
+                        // ★★★ 結餘模式：繪製正負長條圖 (Diverging Bar Chart) ★★★
+                        DrawDivergingBarChart(dataPoints, vm.currency)
+                    } else {
+                        // ★★★ 支出/收入模式：繪製一般長條圖 ★★★
+                        DrawBarChart(dataPoints, vm.averageDaily, vm.currency)
                     }
                 }
+            }
+        }
+    }
+}
+
+// ---------------- 繪製一般長條圖 (支出/收入) ----------------
+@Composable
+fun DrawBarChart(dataPoints: List<Pair<String, Int>>, average: Int, currency: String) {
+    Canvas(Modifier.fillMaxSize()) {
+        val chartWidth = size.width
+        val chartHeight = size.height - 40f
+        val count = dataPoints.size
+
+        val spacing = if (count > 1) chartWidth / (count) else 0f
+        val barWidth = (spacing * 0.6f).coerceAtMost(30.dp.toPx()).coerceAtLeast(2.dp.toPx())
+
+        val maxVal = (dataPoints.maxOfOrNull { it.second } ?: 1).coerceAtLeast(average * 2).toFloat()
+
+        // 畫平均線
+        val avgY = chartHeight - (average / maxVal * chartHeight)
+        if (avgY >= 0) {
+            drawLine(
+                color = DashBlue,
+                start = Offset(0f, avgY),
+                end = Offset(size.width, avgY),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f)),
+                strokeWidth = 3f
+            )
+        }
+
+        // 畫底線
+        drawLine(
+            color = ChartYellow,
+            start = Offset(0f, chartHeight),
+            end = Offset(size.width, chartHeight),
+            strokeWidth = 3f
+        )
+
+        // 畫長條
+        dataPoints.forEachIndexed { i, (label, amount) ->
+            val cx = i * spacing + spacing / 2
+            val x = cx - barWidth / 2
+
+            if (amount > 0) {
+                val barHeight = (amount / maxVal) * chartHeight
+                val y = chartHeight - barHeight
+
+                drawRect(
+                    color = ChartYellow,
+                    topLeft = Offset(x, y),
+                    size = Size(barWidth, barHeight)
+                )
+            }
+
+            // 畫 X 軸文字
+            val step = when {
+                count <= 12 -> 1
+                count <= 31 -> 2
+                else -> count / 10 + 1
+            }
+
+            if (i % step == 0) {
+                val textPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.LTGRAY
+                    textSize = 30f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    label, cx, size.height, textPaint
+                )
+            }
+        }
+    }
+}
+
+// ---------------- 繪製正負長條圖 (結餘) ----------------
+@Composable
+fun DrawDivergingBarChart(dataPoints: List<Pair<String, Int>>, currency: String) {
+    Canvas(Modifier.fillMaxSize()) {
+        val chartWidth = size.width
+        val chartHeight = size.height - 40f
+        val count = dataPoints.size
+
+        if (count < 1) return@Canvas
+
+        val maxVal = dataPoints.maxOfOrNull { it.second }?.toFloat() ?: 0f
+        val minVal = dataPoints.minOfOrNull { it.second }?.toFloat() ?: 0f
+
+        // 計算總範圍 (讓 0 軸可以動態定位)
+        val totalRange = maxVal - minVal
+
+        // 決定 0 軸的 Y 座標
+        // 0 軸距離頂部的距離 = (最大值 / 總範圍) * 高度
+        val zeroY = if (totalRange == 0f) {
+            chartHeight / 2
+        } else {
+            (maxVal / totalRange) * chartHeight
+        }
+
+        // 畫 0 軸基準線 (灰色)
+        drawLine(
+            color = Color.Gray,
+            start = Offset(0f, zeroY),
+            end = Offset(chartWidth, zeroY),
+            strokeWidth = 3f
+        )
+
+        val spacing = if (count > 1) chartWidth / count else 0f
+        val barWidth = (spacing * 0.5f).coerceAtMost(40.dp.toPx()).coerceAtLeast(4.dp.toPx())
+
+        dataPoints.forEachIndexed { i, (label, amount) ->
+            val cx = i * spacing + spacing / 2
+            val x = cx - barWidth / 2
+
+            // 計算長條的高度 (絕對值)
+            val barHeight = if (totalRange == 0f) 0f else (kotlin.math.abs(amount) / totalRange) * chartHeight
+
+            // 決定顏色：正數用藍，負數用紅
+            val barColor = if (amount >= 0) ChartBlue else ChartPink
+
+            // 決定長條的起點和終點
+            val topLeftY = if (amount >= 0) {
+                zeroY - barHeight // 正數往上長
+            } else {
+                zeroY // 負數往下長
+            }
+
+            if (barHeight > 0) {
+                drawRect(
+                    color = barColor,
+                    topLeft = Offset(x, topLeftY),
+                    size = Size(barWidth, barHeight)
+                )
+            }
+
+            // 畫 X 軸文字
+            val step = when {
+                count <= 12 -> 1
+                count <= 31 -> 3
+                else -> count / 7 + 1
+            }
+
+            if (i % step == 0) {
+                val textPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.DKGRAY
+                    textSize = 32f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    label, cx, size.height, textPaint
+                )
             }
         }
     }
@@ -490,7 +600,9 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
 
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("  交易類型", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
+            // 結餘模式顯示不同標題
+            val title = if (vm.chartTab == 2) "  支出佔比 (結餘模式)" else "  交易類型"
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -508,8 +620,11 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
                 if (stats.isEmpty()) {
                     drawCircle(Color.LightGray, style = Stroke(strokeWidth))
                 } else {
+                    // 計算分母：如果是結餘模式，total 可能是結餘總額，這裡我們需要用 stats 的加總
+                    val pieTotal = if (vm.chartTab == 2) stats.sumOf { it.totalAmount } else total
+
                     stats.forEachIndexed { index, stat ->
-                        val sweep = (stat.totalAmount.toFloat() / total) * 360f
+                        val sweep = if(pieTotal > 0) (stat.totalAmount.toFloat() / pieTotal) * 360f else 0f
                         drawArc(
                             color = colors[index % colors.size],
                             startAngle = startAngle,
@@ -523,7 +638,14 @@ fun TypeAnalysisCard(vm: TransactionViewModel) {
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (vm.chartTab == 1) "總收入" else "總支出", fontSize = 12.sp, color = Color.Gray)
+                Text(
+                    when(vm.chartTab){
+                        0 -> "總支出"
+                        1 -> "總收入"
+                        else -> "總結餘"
+                    },
+                    fontSize = 12.sp, color = Color.Gray
+                )
                 Text("${vm.currency}$total", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
             }
         }
@@ -569,9 +691,15 @@ fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) 
     val stats = vm.monthlyCategoryStats
     val colors = listOf(ChartBlue, ChartGreen, ChartPink, ChartYellow, Color(0xFFBA68C8), Color(0xFFFF8A65))
     val isExpense = vm.chartTab == 0
+    val isBalance = vm.chartTab == 2
 
     Column {
-        Text(if(isExpense) "  支出明細" else "  收入明細", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
+        val title = when {
+            isBalance -> "  支出明細 (結餘模式)"
+            isExpense -> "  支出明細"
+            else -> "  收入明細"
+        }
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
         Spacer(Modifier.height(8.dp))
 
         Card(
@@ -584,11 +712,10 @@ fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) 
                 stats.forEachIndexed { index, item ->
                     val color = colors[index % colors.size]
 
-                    // ★ 修改：加入 clickable 來觸發導航
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onCategoryClick(item.key) }
+                            .clickable { onCategoryClick(item.key) } // 點擊觸發導航
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -598,7 +725,9 @@ fun DetailListCard(vm: TransactionViewModel, onCategoryClick: (String) -> Unit) 
                         Spacer(Modifier.width(24.dp))
                         Text("(${item.count}筆)", fontSize = 12.sp, color = Color.Gray)
                         Spacer(Modifier.weight(1f))
-                        val sign = if (isExpense) "-" else ""
+
+                        // 結餘模式下的明細也是支出，所以加負號
+                        val sign = if (isExpense || isBalance) "-" else ""
                         Text(
                             "$sign${vm.currency}${item.totalAmount}",
                             fontSize = 16.sp,
