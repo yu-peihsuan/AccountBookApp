@@ -3,19 +3,23 @@ package com.example.accountbook.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.accountbook.viewmodel.TransactionViewModel
+import java.io.File
 
 @Composable
 fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
@@ -39,12 +43,24 @@ fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
 
             //-- 使用者頭像 + 名稱橫向顯示
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = "User Avatar",
-                    modifier = Modifier.size(48.dp),
-                    tint = Color(0xFF4A463F)
-                )
+                // ★ 修改：顯示大頭照
+                if (vm.userAvatar.isNotEmpty()) {
+                    AsyncImage(
+                        model = File(vm.userAvatar),
+                        contentDescription = "User Avatar",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "User Avatar",
+                        modifier = Modifier.size(48.dp),
+                        tint = Color(0xFF4A463F)
+                    )
+                }
 
                 Spacer(Modifier.width(14.dp))
 
@@ -78,8 +94,6 @@ fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
         }
     }
 }
-
-
 
 @Composable
 fun DrawerItem(text:String, route:String, onSelect:(String)->Unit, bgColor: Color) {

@@ -1,16 +1,23 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.accountbook.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
@@ -21,13 +28,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.accountbook.viewmodel.TransactionViewModel
+import java.io.File
 
 val SettingBgColor = Color(0xFFFDFBF7)
 
@@ -43,10 +53,31 @@ fun SettingScreen(
     onOpenDrawer: () -> Unit // 選單抽屜觸發
 ) {
     val strings = vm.currentStrings
-    var tempBudget by remember { mutableStateOf(vm.budget.toString()) }
-    val focusManager = LocalFocusManager.current
 
+    // 預算相關狀態
+    var tempBudget by remember { mutableStateOf(vm.budget.toString()) }
+    var showBudgetDialog by remember { mutableStateOf(false) }
+
+    val focusManager = LocalFocusManager.current
     var showCurrencyDialog by remember { mutableStateOf(false) }
+
+    // 修改名稱相關狀態
+    var showNameDialog by remember { mutableStateOf(false) }
+    var tempName by remember { mutableStateOf("") }
+    var nameErrorMsg by remember { mutableStateOf("") }
+
+    // 捲動狀態
+    val scrollState = rememberScrollState()
+
+    // 圖片選擇器
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                vm.updateUserAvatar(uri)
+            }
+        }
+    )
 
     Scaffold(
         containerColor = SettingBgColor,
@@ -67,24 +98,97 @@ fun SettingScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween // 讓登出保持在最底部
+                .padding(24.dp)
         ) {
 
-            // ====== 上半部設定區塊 ======
-            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            // ====== 上半部設定區塊 (可捲動) ======
+            Column(
+                modifier = Modifier
+                    .weight(1f) // 佔據剩餘空間
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
 
                 // ============= 帳號管理 =============
                 SettingSection(title = strings.sectionAccount, icon = Icons.Outlined.Person) {
+
+                    // 大頭照設定區塊
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .border(1.dp, SettingBorderColor, CircleShape)
+                                .clickable {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (vm.userAvatar.isNotEmpty()) {
+                                AsyncImage(
+                                    model = File(vm.userAvatar),
+                                    contentDescription = "User Avatar",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.Person,
+                                    contentDescription = "Default Avatar",
+                                    modifier = Modifier.size(60.dp),
+                                    tint = Color.Gray
+                                )
+                            }
+                        }
+                        // 編輯圖示
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = (-110).dp)
+                                .background(SettingTextColor, CircleShape)
+                                .padding(6.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        }
+                    }
+
                     SettingItemDisplay(label = strings.labelAccount, value = vm.userEmail.ifEmpty { "N/A" })
                     Spacer(Modifier.height(12.dp))
-                    SettingItemDisplay(label = strings.labelName, value = vm.userName.ifEmpty { "N/A" })
+
+                    // 名稱顯示與編輯
+                    Box(
+                        Modifier.clickable {
+                            tempName = vm.userName
+                            nameErrorMsg = ""
+                            showNameDialog = true
+                        }
+                    ) {
+                        SettingItemDisplay(label = strings.labelName, value = vm.userName.ifEmpty { "N/A" })
+                        // 編輯提示圖示
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp, top = 20.dp)
+                                .size(16.dp)
+                        )
+                    }
                 }
 
                 // ============= 系統設定 =============
                 SettingSection(title = strings.sectionFunction, icon = Icons.Outlined.Settings) {
 
-                    // ★幣別切換
+                    // 幣別切換
                     SettingItemValue(
                         label = strings.labelCurrency,
                         value = vm.currency,
@@ -93,35 +197,25 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // ★預算輸入框
-                    Text(strings.labelBudget, color = SettingTextColor, fontSize = 14.sp, modifier = Modifier.padding(bottom = 4.dp))
-                    OutlinedTextField(
-                        value = tempBudget,
-                        onValueChange = { if (it.all { char -> char.isDigit() }) tempBudget = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = SettingBorderColor,
-                            unfocusedBorderColor = SettingBorderColor,
-                            cursorColor = SettingTextColor,
-                            focusedTextColor = SettingTextColor,
-                            unfocusedTextColor = SettingTextColor
-                        ),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(onClick = {
-                                val newBudget = tempBudget.toIntOrNull() ?: 0
-                                vm.updateBudget(newBudget)
-                                focusManager.clearFocus()
-                            }) {
-                                Icon(Icons.Default.Check, contentDescription = "Save", tint = Color(0xFF4CAF50))
-                            }
+                    // ★ 修改：預算設定 (改成 Dialog 模式，與名稱修改一致)
+                    Box(
+                        Modifier.clickable {
+                            tempBudget = vm.budget.toString()
+                            showBudgetDialog = true
                         }
-                    )
+                    ) {
+                        SettingItemDisplay(label = strings.labelBudget, value = vm.budget.toString())
+                        // 編輯提示圖示
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp, top = 20.dp)
+                                .size(16.dp)
+                        )
+                    }
 
                     Spacer(Modifier.height(12.dp))
 
@@ -129,32 +223,33 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    SettingItemDisplay(label = strings.labelLanguage, value = "中文(繁體)")  // (固定顯示)
+                    SettingItemDisplay(label = strings.labelLanguage, value = "中文(繁體)")
 
                     Spacer(Modifier.height(12.dp))
                     SettingItemAction(label = strings.labelHelp)
                 }
+
+                Spacer(Modifier.height(10.dp))
             }
 
-            // ======= 🔥 底部滿版紅色 登出按鈕 (與圖片一樣) =======
+            // ======= 🔥 底部滿版紅色 登出按鈕 (固定在下方) =======
+            Spacer(Modifier.height(16.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))   // 圓角更大、更接近圖片
-                    .background(Color(0xFFE57373))     // 圖片中柔和飽和度的紅色
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFE57373))
                     .clickable { onLogout() }
-                    .padding(vertical = 16.dp),        // 高度一致
+                    .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "登出",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White               // 文字白色 ✔
+                    color = Color.White
                 )
             }
-
-
         }
     }
 
@@ -176,6 +271,74 @@ fun SettingScreen(
                 showCurrencyDialog = false
             },
             strings = strings
+        )
+    }
+
+    // ====== 修改名稱 Dialog ======
+    if (showNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            title = { Text("修改名稱", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = tempName,
+                        onValueChange = { tempName = it },
+                        singleLine = true,
+                        label = { Text("新名稱") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (nameErrorMsg.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(nameErrorMsg, color = Color.Red, fontSize = 14.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val result = vm.updateUserName(tempName)
+                    if (result.isEmpty()) {
+                        showNameDialog = false
+                    } else {
+                        nameErrorMsg = result
+                    }
+                }) { Text("確定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameDialog = false }) { Text("取消", color = Color.Gray) }
+            },
+            containerColor = Color.White
+        )
+    }
+
+    // ★ 修改：新增預算修改 Dialog
+    if (showBudgetDialog) {
+        AlertDialog(
+            onDismissRequest = { showBudgetDialog = false },
+            title = { Text(strings.labelBudget, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = tempBudget,
+                        onValueChange = { if (it.all { char -> char.isDigit() }) tempBudget = it },
+                        singleLine = true,
+                        label = { Text(strings.budget) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newBudget = tempBudget.toIntOrNull() ?: 0
+                    vm.updateBudget(newBudget)
+                    showBudgetDialog = false
+                }) { Text("確定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBudgetDialog = false }) { Text("取消", color = Color.Gray) }
+            },
+            containerColor = Color.White
         )
     }
 }

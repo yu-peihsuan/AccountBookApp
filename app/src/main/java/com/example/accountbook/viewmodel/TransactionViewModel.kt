@@ -2,6 +2,7 @@ package com.example.accountbook.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -10,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.example.accountbook.data.DBHandler
+import java.io.File
 import java.io.Serializable
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -49,7 +51,7 @@ interface StringResources {
     val categoryLunch: String
     val categoryDinner: String
     val categoryDrink: String
-    val categorySnack: String // ★ 新增
+    val categorySnack: String
     val categoryTraffic: String
     val categoryShopping: String
     val categoryDaily: String
@@ -58,9 +60,9 @@ interface StringResources {
     val categoryBills: String
     val categoryOther: String
     // Income Categories
-    val categorySalary: String // ★ 新增
-    val categoryBonus: String // ★ 新增
-    val categoryRewards: String // ★ 新增
+    val categorySalary: String
+    val categoryBonus: String
+    val categoryRewards: String
 
     val categoryAdd: String
     val settingTitle: String
@@ -114,7 +116,7 @@ object StringsZH : StringResources {
     override val categoryLunch = "午餐"
     override val categoryDinner = "晚餐"
     override val categoryDrink = "飲料"
-    override val categorySnack = "點心" // ★
+    override val categorySnack = "點心"
     override val categoryTraffic = "交通"
     override val categoryShopping = "購物"
     override val categoryDaily = "日用品"
@@ -123,9 +125,9 @@ object StringsZH : StringResources {
     override val categoryBills = "生活繳費"
     override val categoryOther = "其他"
     // Income
-    override val categorySalary = "薪水" // ★
-    override val categoryBonus = "獎金" // ★
-    override val categoryRewards = "回饋" // ★
+    override val categorySalary = "薪水"
+    override val categoryBonus = "獎金"
+    override val categoryRewards = "回饋"
 
     override val categoryAdd = "新增分類"
     override val settingTitle = "設定"
@@ -179,7 +181,7 @@ object StringsEN : StringResources {
     override val categoryLunch = "Lunch"
     override val categoryDinner = "Dinner"
     override val categoryDrink = "Drink"
-    override val categorySnack = "Snack" // ★
+    override val categorySnack = "Snack"
     override val categoryTraffic = "Traffic"
     override val categoryShopping = "Shopping"
     override val categoryDaily = "Daily"
@@ -188,9 +190,9 @@ object StringsEN : StringResources {
     override val categoryBills = "Bills"
     override val categoryOther = "Other"
     // Income
-    override val categorySalary = "Salary" // ★
-    override val categoryBonus = "Bonus" // ★
-    override val categoryRewards = "Rewards" // ★
+    override val categorySalary = "Salary"
+    override val categoryBonus = "Bonus"
+    override val categoryRewards = "Rewards"
 
     override val categoryAdd = "Add"
     override val settingTitle = "Settings"
@@ -250,6 +252,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var userEmail by mutableStateOf("")
         private set
+    var userAvatar by mutableStateOf("")
+        private set
+
     var isLoggedIn by mutableStateOf(false)
         private set
 
@@ -298,6 +303,55 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         customStartDateMillis = c.timeInMillis
     }
 
+    // 更新大頭照
+    fun updateUserAvatar(uri: Uri) {
+        if (currentUserId == -1) return
+
+        try {
+            // 1. 將圖片複製到 App 內部儲存空間
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val fileName = "avatar_${currentUserId}_${System.currentTimeMillis()}.jpg"
+            val file = File(context.filesDir, fileName)
+            inputStream?.use { input ->
+                file.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            val newPath = file.absolutePath
+
+            // 2. 更新資料庫
+            dbHandler.updateUserAvatar(currentUserId, newPath)
+
+            // 3. 更新 Prefs 和 State
+            prefs.edit().putString("user_avatar", newPath).apply()
+            userAvatar = newPath
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // ★ 新增：修改使用者名稱
+    fun updateUserName(newName: String): String {
+        if (currentUserId == -1) return "尚未登入"
+        if (newName.isBlank()) return "名稱不能為空"
+        // 如果跟原本的一樣，就直接回傳成功，不用查 DB
+        if (newName == userName) return ""
+
+        // 檢查是否重複
+        if (dbHandler.checkUserExists(newName)) {
+            return "此名稱已被使用"
+        }
+
+        // 更新 DB
+        dbHandler.updateUserName(currentUserId, newName)
+
+        // 更新 State & Prefs
+        userName = newName
+        prefs.edit().putString("user_name", newName).apply()
+
+        return "" // 回傳空字串代表成功
+    }
+
     fun applyQuickRange(rangeType: String) {
         val calendar = Calendar.getInstance()
         val today = System.currentTimeMillis()
@@ -332,7 +386,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             "lunch" -> s.categoryLunch
             "dinner" -> s.categoryDinner
             "drink" -> s.categoryDrink
-            "snack" -> s.categorySnack // ★
+            "snack" -> s.categorySnack
             "traffic" -> s.categoryTraffic
             "shopping" -> s.categoryShopping
             "daily" -> s.categoryDaily
@@ -340,9 +394,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             "rent" -> s.categoryRent
             "bills" -> s.categoryBills
             "other" -> s.categoryOther
-            "salary" -> s.categorySalary // ★
-            "bonus" -> s.categoryBonus // ★
-            "rewards" -> s.categoryRewards // ★
+            "salary" -> s.categorySalary
+            "bonus" -> s.categoryBonus
+            "rewards" -> s.categoryRewards
             "add" -> s.categoryAdd
             else -> key
         }
@@ -359,12 +413,14 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 .putInt("user_id", newUserId.toInt())
                 .putString("user_name", name)
                 .putString("user_email", email)
+                .putString("user_avatar", "") // 註冊時預設無大頭照
                 .putBoolean("is_logged_in", true)
                 .apply()
 
             currentUserId = newUserId.toInt()
             userName = name
             userEmail = email
+            userAvatar = ""
             isLoggedIn = true
             _transactions.clear()
             loadCategories()
@@ -379,16 +435,21 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
         if (userInfo != null) {
             val (id, name) = userInfo
+            // 登入成功後，從 DB 讀取大頭照路徑
+            val avatarPath = dbHandler.getUserAvatar(id)
+
             prefs.edit()
                 .putInt("user_id", id)
                 .putString("user_name", name)
                 .putString("user_email", email)
+                .putString("user_avatar", avatarPath)
                 .putBoolean("is_logged_in", true)
                 .apply()
 
             currentUserId = id
             userName = name
             userEmail = email
+            userAvatar = avatarPath
             isLoggedIn = true
             loadData()
             return true
@@ -406,6 +467,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             currentUserId = prefs.getInt("user_id", -1)
             userName = prefs.getString("user_name", "") ?: ""
             userEmail = prefs.getString("user_email", "") ?: ""
+            userAvatar = prefs.getString("user_avatar", "") ?: ""
         }
     }
 
@@ -418,6 +480,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         isLoggedIn = false
         userName = ""
         userEmail = ""
+        userAvatar = "" // 清空
         currentUserId = -1
         _transactions.clear()
         customCategories.clear()

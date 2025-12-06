@@ -13,7 +13,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
 
     companion object {
         private const val DB_NAME = "accountbook_db"
-        private const val DB_VERSION = 4 // ★ 版本升級為 4
+        private const val DB_VERSION = 5
 
         private const val TABLE_NAME = "transactions"
         private const val ID_COL = "id"
@@ -30,8 +30,9 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         private const val USER_NAME_COL = "name"
         private const val USER_EMAIL_COL = "email"
         private const val USER_PASS_COL = "password"
+        private const val USER_AVATAR_COL = "avatar"
 
-        // ★ 新增：類別資料表
+        // 類別資料表
         private const val TABLE_CATEGORIES = "categories"
         private const val CAT_ID_COL = "id"
         private const val CAT_USER_ID_COL = "user_id"
@@ -55,10 +56,11 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
                 + USER_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + USER_NAME_COL + " TEXT,"
                 + USER_EMAIL_COL + " TEXT,"
-                + USER_PASS_COL + " TEXT)")
+                + USER_PASS_COL + " TEXT,"
+                + USER_AVATAR_COL + " TEXT)")
         db.execSQL(queryUsers)
 
-        // ★ 建立類別資料表
+        // 建立類別資料表
         val queryCategories = ("CREATE TABLE " + TABLE_CATEGORIES + " ("
                 + CAT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + CAT_USER_ID_COL + " INTEGER,"
@@ -68,11 +70,21 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // 注意：這裡為了開發方便會清除舊資料，正式版建議改用 ALTER TABLE
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CATEGORIES")
-        onCreate(db)
+        if (oldVersion < 4) {
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_CATEGORIES")
+            onCreate(db)
+            return
+        }
+
+        if (oldVersion < 5) {
+            try {
+                db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN $USER_AVATAR_COL TEXT")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     // --- User Methods ---
@@ -98,6 +110,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         values.put(USER_NAME_COL, name)
         values.put(USER_EMAIL_COL, email)
         values.put(USER_PASS_COL, pass)
+        values.put(USER_AVATAR_COL, "") // 預設空字串
         val newId = db.insert(TABLE_USERS, null, values)
         db.close()
         return newId
@@ -119,7 +132,35 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return userInfo
     }
 
-    // --- Category Methods (New) ---
+    fun updateUserAvatar(userId: Int, path: String) {
+        val db = this.writableDatabase
+        val values = ContentValues()
+        values.put(USER_AVATAR_COL, path)
+        db.update(TABLE_USERS, values, "$USER_ID_COL = ?", arrayOf(userId.toString()))
+        db.close()
+    }
+
+    // ★ 新增：更新使用者名稱
+    fun updateUserName(userId: Int, newName: String) {
+        val db = this.writableDatabase
+        val values = ContentValues()
+        values.put(USER_NAME_COL, newName)
+        db.update(TABLE_USERS, values, "$USER_ID_COL = ?", arrayOf(userId.toString()))
+        db.close()
+    }
+
+    fun getUserAvatar(userId: Int): String {
+        val db = this.readableDatabase
+        var avatarPath = ""
+        val cursor = db.rawQuery("SELECT $USER_AVATAR_COL FROM $TABLE_USERS WHERE $USER_ID_COL = ?", arrayOf(userId.toString()))
+        if (cursor.moveToFirst()) {
+            avatarPath = cursor.getString(0) ?: ""
+        }
+        cursor.close()
+        return avatarPath
+    }
+
+    // --- Category Methods ---
     fun addCategory(userId: Int, name: String, key: String) {
         val db = this.writableDatabase
         val values = ContentValues()
@@ -393,7 +434,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return list
     }
 
-    // ★★★ 新增：取得特定分類在指定範圍內的詳細交易列表 ★★★
+    // 取得特定分類在指定範圍內的詳細交易列表
     fun getCategoryTransactions(userId: Int, categoryKey: String, startDate: String, endDate: String, typeFilter: String, isLikeQuery: Boolean): List<Transaction> {
         val db = this.readableDatabase
         val list = ArrayList<Transaction>()
@@ -401,10 +442,10 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         val isExpense = typeFilter == "支出" || typeFilter == "Expense"
         val typeQuery = if (isExpense) "($TYPE_COL = '支出' OR $TYPE_COL = 'Expense')" else "($TYPE_COL = '收入' OR $TYPE_COL = 'Income')"
 
-        // 構建查詢語句：如果是年/月模式用 LIKE，如果是區間模式用 >= 和 <=
+        // 構建查詢語句
         val dateCondition = if (isLikeQuery) "$DATE_COL LIKE ?" else "$DATE_COL >= ? AND $DATE_COL <= ?"
         val args = if (isLikeQuery) {
-            arrayOf(userId.toString(), categoryKey, startDate) // startDate 這裡會是 "yyyy/MM%" 或 "yyyy/%"
+            arrayOf(userId.toString(), categoryKey, startDate)
         } else {
             arrayOf(userId.toString(), categoryKey, startDate, endDate)
         }
