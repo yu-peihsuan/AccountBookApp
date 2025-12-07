@@ -64,8 +64,11 @@ fun SettingScreen(
     var tempName by remember { mutableStateOf("") }
     var nameErrorMsg by remember { mutableStateOf("") }
 
-    // ★ 新增：刪除帳號確認 Dialog 狀態
+    // 刪除帳號確認 Dialog 狀態
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    // ★ 新增：使用說明 Dialog 狀態
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     // 捲動狀態
     val scrollState = rememberScrollState()
@@ -187,7 +190,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // ★ 新增：刪除帳號按鈕 (放在帳號管理區塊底部)
+                    // 刪除帳號按鈕
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -236,7 +239,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // ★ 修改：實作匯出按鈕功能
+                    // 匯出按鈕
                     SettingItemAction(label = strings.labelExport) {
                         vm.exportTransactionData(context)
                     }
@@ -246,7 +249,11 @@ fun SettingScreen(
                     SettingItemDisplay(label = strings.labelLanguage, value = "中文(繁體)")
 
                     Spacer(Modifier.height(12.dp))
-                    SettingItemAction(label = strings.labelHelp) { /* TODO Help */ }
+
+                    // ★ 修改：使用說明按鈕事件
+                    SettingItemAction(label = strings.labelHelp) {
+                        showHelpDialog = true
+                    }
                 }
 
                 Spacer(Modifier.height(10.dp))
@@ -362,7 +369,7 @@ fun SettingScreen(
         )
     }
 
-    // ★ 新增：刪除帳號確認 Dialog
+    // 刪除帳號確認 Dialog
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
@@ -384,8 +391,29 @@ fun SettingScreen(
             containerColor = Color.White
         )
     }
+
+    // ★ 新增：使用說明 Dialog
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = { Text(strings.helpTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                // 使用 Box 和 verticalScroll 來確保長篇文字可以捲動
+                Box(modifier = Modifier.heightIn(max = 400.dp)) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Text(strings.helpContent, lineHeight = 20.sp, fontSize = 15.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelpDialog = false }) { Text(strings.btnConfirm) }
+            },
+            containerColor = Color.White
+        )
+    }
 }
 
+// ... (SettingSection, SettingItemDisplay 等 Helper Composable 維持不變)
 @Composable
 fun SettingSection(title: String, icon: ImageVector, content: @Composable () -> Unit) {
     Column {
@@ -434,7 +462,6 @@ fun SettingItemValue(label: String, value: String, onClick: () -> Unit) {
     }
 }
 
-// ★ 修改：支援 onClick
 @Composable
 fun SettingItemAction(label: String, onClick: () -> Unit) {
     Box(

@@ -87,13 +87,17 @@ interface StringResources {
     val dateFormat: String
     val dayFormat: String
 
-    // ★ 新增：刪除與匯出相關文字
+    // 刪除與匯出
     val labelDeleteAccount: String
     val titleDeleteConfirm: String
     val msgDeleteConfirm: String
     val btnDelete: String
     val msgExportSuccess: String
     val msgExportFail: String
+
+    // ★ 新增：使用說明內容
+    val helpTitle: String
+    val helpContent: String
 }
 
 object StringsZH : StringResources {
@@ -160,13 +164,35 @@ object StringsZH : StringResources {
     override val dateFormat = "yyyy/MM/dd"
     override val dayFormat = "EEEE"
 
-    // ★ 新增
     override val labelDeleteAccount = "刪除帳號"
     override val titleDeleteConfirm = "確定要刪除帳號嗎?"
     override val msgDeleteConfirm = "此動作無法復原，刪除帳號後，該帳號資料將會永久消失。"
     override val btnDelete = "刪除"
     override val msgExportSuccess = "匯出成功"
     override val msgExportFail = "匯出失敗"
+
+    // ★ 新增
+    override val helpTitle = "使用說明"
+    override val helpContent = """
+        1. 記帳
+        點擊選單中的「記帳本」或首頁右下角的「+」按鈕，輸入金額、選擇分類與日期後即可新增一筆交易。
+
+        2. 檢視紀錄
+        在「交易紀錄」頁面可查看所有收支明細。點擊單筆紀錄可進行編輯或刪除。
+
+        3. 圖表分析
+        點擊「圖表分析」可查看收支圓餅圖與每日長條圖。上方可切換「年/月/自訂」區間來篩選資料。
+
+        4. 帳號與設定
+        - 修改頭像：在設定頁點擊上方大頭照圓圈，即可選擇手機內的圖片。
+        - 修改名稱：點擊使用者名稱欄位，輸入新名稱後按確定。
+        - 貨幣設定：點擊「貨幣符號」可切換台幣 (NT$)、美金 ($) 或日幣 (¥)。
+        - 預算設定：設定「每月預算」，首頁上方會顯示預算剩餘額度。
+
+        5. 資料管理
+        - 匯出資料：將所有紀錄匯出成 CSV 檔案，可用 Excel 開啟。
+        - 刪除帳號：永久刪除此帳號與所有資料，此動作無法復原。
+    """.trimIndent()
 }
 
 object StringsEN : StringResources {
@@ -233,16 +259,39 @@ object StringsEN : StringResources {
     override val dateFormat = "MM/dd/yyyy"
     override val dayFormat = "EEEE"
 
-    // ★ 新增
     override val labelDeleteAccount = "Delete Account"
     override val titleDeleteConfirm = "Delete Account"
     override val msgDeleteConfirm = "Are you sure you want to delete your account? This action cannot be undone and all data will be lost."
     override val btnDelete = "Delete"
     override val msgExportSuccess = "Export Successful"
     override val msgExportFail = "Export Failed"
+
+    // ★ 新增
+    override val helpTitle = "User Guide"
+    override val helpContent = """
+        1. Add Record
+        Tap "Add Record" or the "+" button. Enter amount, select category/date, and save.
+
+        2. View History
+        Check "History" for all transactions. Tap an item to edit or delete it.
+
+        3. Analysis
+        View Pie/Bar charts in "Analysis". Switch between Month/Year/Custom range at the top.
+
+        4. Account & Settings
+        - Change Avatar: Tap the avatar icon in Settings to pick a photo.
+        - Change Name: Tap your username to edit it.
+        - Currency: Tap "Currency" to switch between NT$, $, or ¥.
+        - Budget: Set your monthly budget. Home screen shows the remaining balance.
+
+        5. Data Management
+        - Export Data: Export all records to a CSV file.
+        - Delete Account: Permanently delete your account and data.
+    """.trimIndent()
 }
 
-// ---------------- ViewModel ----------------
+// ---------------- ViewModel (其餘部分保持不變) ----------------
+// ... (省略 TransactionViewModel 的其餘不變程式碼)
 
 data class CustomCategory(val name: String, val key: String)
 
