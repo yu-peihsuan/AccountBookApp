@@ -11,14 +11,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -29,9 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,19 +50,22 @@ fun SettingScreen(
     onLogout: () -> Unit,
     onOpenDrawer: () -> Unit // 選單抽屜觸發
 ) {
+    val context = LocalContext.current
     val strings = vm.currentStrings
 
     // 預算相關狀態
     var tempBudget by remember { mutableStateOf(vm.budget.toString()) }
     var showBudgetDialog by remember { mutableStateOf(false) }
 
-    val focusManager = LocalFocusManager.current
     var showCurrencyDialog by remember { mutableStateOf(false) }
 
     // 修改名稱相關狀態
     var showNameDialog by remember { mutableStateOf(false) }
     var tempName by remember { mutableStateOf("") }
     var nameErrorMsg by remember { mutableStateOf("") }
+
+    // ★ 新增：刪除帳號確認 Dialog 狀態
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     // 捲動狀態
     val scrollState = rememberScrollState()
@@ -183,6 +184,23 @@ fun SettingScreen(
                                 .size(16.dp)
                         )
                     }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // ★ 新增：刪除帳號按鈕 (放在帳號管理區塊底部)
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { showDeleteConfirmDialog = true }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(strings.labelDeleteAccount, color = Color.Red, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
 
                 // ============= 系統設定 =============
@@ -197,7 +215,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // ★ 修改：預算設定 (改成 Dialog 模式，與名稱修改一致)
+                    // 預算設定
                     Box(
                         Modifier.clickable {
                             tempBudget = vm.budget.toString()
@@ -205,7 +223,6 @@ fun SettingScreen(
                         }
                     ) {
                         SettingItemDisplay(label = strings.labelBudget, value = vm.budget.toString())
-                        // 編輯提示圖示
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit",
@@ -219,20 +236,23 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    SettingItemAction(label = strings.labelExport)
+                    // ★ 修改：實作匯出按鈕功能
+                    SettingItemAction(label = strings.labelExport) {
+                        vm.exportTransactionData(context)
+                    }
 
                     Spacer(Modifier.height(12.dp))
 
                     SettingItemDisplay(label = strings.labelLanguage, value = "中文(繁體)")
 
                     Spacer(Modifier.height(12.dp))
-                    SettingItemAction(label = strings.labelHelp)
+                    SettingItemAction(label = strings.labelHelp) { /* TODO Help */ }
                 }
 
                 Spacer(Modifier.height(10.dp))
             }
 
-            // ======= 🔥 底部滿版紅色 登出按鈕 (固定在下方) =======
+            // ======= 底部滿版紅色 登出按鈕 =======
             Spacer(Modifier.height(16.dp))
             Box(
                 modifier = Modifier
@@ -244,7 +264,7 @@ fun SettingScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "登出",
+                    strings.menuLogout,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -311,7 +331,7 @@ fun SettingScreen(
         )
     }
 
-    // ★ 修改：新增預算修改 Dialog
+    // ====== 預算修改 Dialog ======
     if (showBudgetDialog) {
         AlertDialog(
             onDismissRequest = { showBudgetDialog = false },
@@ -337,6 +357,29 @@ fun SettingScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showBudgetDialog = false }) { Text("取消", color = Color.Gray) }
+            },
+            containerColor = Color.White
+        )
+    }
+
+    // ★ 新增：刪除帳號確認 Dialog
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text(strings.titleDeleteConfirm, fontWeight = FontWeight.Bold, color = Color.Red, fontSize = 18.sp) },
+            text = { Text(strings.msgDeleteConfirm) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        vm.deleteCurrentAccount()
+                        onLogout() // 觸發登出導航
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) { Text(strings.btnDelete) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) { Text(strings.btnCancel, color = Color.Gray) }
             },
             containerColor = Color.White
         )
@@ -391,14 +434,15 @@ fun SettingItemValue(label: String, value: String, onClick: () -> Unit) {
     }
 }
 
+// ★ 修改：支援 onClick
 @Composable
-fun SettingItemAction(label: String) {
+fun SettingItemAction(label: String, onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
             .border(1.dp, SettingBorderColor, RoundedCornerShape(8.dp))
             .background(Color.White, RoundedCornerShape(8.dp))
-            .clickable { /* TODO */ }
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(

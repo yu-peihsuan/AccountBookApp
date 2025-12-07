@@ -140,7 +140,6 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         db.close()
     }
 
-    // ★ 新增：更新使用者名稱
     fun updateUserName(userId: Int, newName: String) {
         val db = this.writableDatabase
         val values = ContentValues()
@@ -158,6 +157,25 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         }
         cursor.close()
         return avatarPath
+    }
+
+    // ★ 新增：刪除使用者所有資料 (交易、分類、帳號)
+    fun deleteUserData(userId: Int) {
+        val db = this.writableDatabase
+        db.beginTransaction()
+        try {
+            // 1. 刪除該使用者的所有交易
+            db.delete(TABLE_NAME, "$TR_USER_ID_COL = ?", arrayOf(userId.toString()))
+            // 2. 刪除該使用者的自訂分類
+            db.delete(TABLE_CATEGORIES, "$CAT_USER_ID_COL = ?", arrayOf(userId.toString()))
+            // 3. 刪除使用者帳號
+            db.delete(TABLE_USERS, "$USER_ID_COL = ?", arrayOf(userId.toString()))
+
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+            db.close()
+        }
     }
 
     // --- Category Methods ---

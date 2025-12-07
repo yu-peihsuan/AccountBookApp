@@ -2,16 +2,20 @@ package com.example.accountbook.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import com.example.accountbook.data.DBHandler
 import java.io.File
+import java.io.FileWriter
 import java.io.Serializable
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -82,6 +86,14 @@ interface StringResources {
     val chartBar: String
     val dateFormat: String
     val dayFormat: String
+
+    // ★ 新增：刪除與匯出相關文字
+    val labelDeleteAccount: String
+    val titleDeleteConfirm: String
+    val msgDeleteConfirm: String
+    val btnDelete: String
+    val msgExportSuccess: String
+    val msgExportFail: String
 }
 
 object StringsZH : StringResources {
@@ -147,6 +159,14 @@ object StringsZH : StringResources {
     override val chartBar = "近期每日支出 (長條圖)"
     override val dateFormat = "yyyy/MM/dd"
     override val dayFormat = "EEEE"
+
+    // ★ 新增
+    override val labelDeleteAccount = "刪除帳號"
+    override val titleDeleteConfirm = "確定要刪除帳號嗎?"
+    override val msgDeleteConfirm = "此動作無法復原，刪除帳號後，該帳號資料將會永久消失。"
+    override val btnDelete = "刪除"
+    override val msgExportSuccess = "匯出成功"
+    override val msgExportFail = "匯出失敗"
 }
 
 object StringsEN : StringResources {
@@ -212,6 +232,14 @@ object StringsEN : StringResources {
     override val chartBar = "Daily Expenses (Bar Chart)"
     override val dateFormat = "MM/dd/yyyy"
     override val dayFormat = "EEEE"
+
+    // ★ 新增
+    override val labelDeleteAccount = "Delete Account"
+    override val titleDeleteConfirm = "Delete Account"
+    override val msgDeleteConfirm = "Are you sure you want to delete your account? This action cannot be undone and all data will be lost."
+    override val btnDelete = "Delete"
+    override val msgExportSuccess = "Export Successful"
+    override val msgExportFail = "Export Failed"
 }
 
 // ---------------- ViewModel ----------------
@@ -330,7 +358,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 新增：修改使用者名稱
+    // 新增：修改使用者名稱
     fun updateUserName(newName: String): String {
         if (currentUserId == -1) return "尚未登入"
         if (newName.isBlank()) return "名稱不能為空"
@@ -484,6 +512,89 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         currentUserId = -1
         _transactions.clear()
         customCategories.clear()
+    }
+
+    // ★ 新增：刪除當前帳號
+    fun deleteCurrentAccount() {
+        if (currentUserId != -1) {
+            dbHandler.deleteUserData(currentUserId)
+            logout()
+        }
+    }
+
+    // ★ 修改：匯出所有資料 (包含使用者資訊、設定、自訂分類、交易紀錄)
+    fun exportTransactionData(context: Context) {
+        if (currentUserId == -1) return
+
+        try {
+            val fileName = "AccountBook_Full_Export_${System.currentTimeMillis()}.csv"
+            val file = File(context.cacheDir, fileName)
+            val writer = FileWriter(file)
+
+            // 1. 寫入 BOM (\uFEFF) 以防止 Excel 中文亂碼
+            writer.append("\uFEFF")
+
+            // ==========================================
+            //區塊 1: 使用者資訊與設定
+            // ==========================================
+            writer.append("--- User Profile & Settings ---\n")
+            writer.append("Item,Value\n")
+            writer.append("User Name,${userName}\n")
+            writer.append("User Email,${userEmail}\n") // 帳號
+            writer.append("Budget,${budget}\n")
+            writer.append("Currency,${currency}\n")
+            writer.append("Language,${language}\n")
+            writer.append("\n") // 空一行分隔
+
+            // ==========================================
+            // 區塊 2: 自訂分類
+            // ==========================================
+            writer.append("--- Custom Categories ---\n")
+            val categories = dbHandler.getCategories(currentUserId)
+            if (categories.isNotEmpty()) {
+                writer.append("Category Name,Key\n")
+                for (cat in categories) {
+                    // cat.first 是名稱, cat.second 是 key
+                    writer.append("${cat.first},${cat.second}\n")
+                }
+            } else {
+                writer.append("(No Custom Categories)\n")
+            }
+            writer.append("\n") // 空一行分隔
+
+            // ==========================================
+            // 區塊 3: 交易紀錄
+            // ==========================================
+            writer.append("--- Transactions ---\n")
+            writer.append("Date,Day,Type,Category,Item,Amount\n")
+
+            val transactions = dbHandler.getAllTransactions(currentUserId)
+            for (tx in transactions) {
+                val categoryName = getCategoryName(tx.categoryKey)
+
+                // 清理文字中的逗號與換行，避免 CSV 格式跑掉
+                val cleanTitle = tx.title.replace(",", " ").replace("\n", " ")
+                val cleanCategory = categoryName.replace(",", " ")
+
+                writer.append("${tx.date},${tx.day},${tx.type},${cleanCategory},${cleanTitle},${tx.amount}\n")
+            }
+
+            writer.flush()
+            writer.close()
+
+            // 呼叫系統分享
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "匯出完整資料"))
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, currentStrings.msgExportFail, Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun updateBudget(newBudget: Int) {
