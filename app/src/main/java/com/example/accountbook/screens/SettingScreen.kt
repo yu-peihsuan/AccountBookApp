@@ -1,6 +1,11 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.accountbook.screens
 
+import android.Manifest
+import android.app.TimePickerDialog
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -33,9 +39,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.accountbook.viewmodel.TransactionViewModel
 import java.io.File
+import java.util.Locale
 
 val SettingBgColor = Color(0xFFFDFBF7)
 
@@ -67,7 +75,7 @@ fun SettingScreen(
     // 刪除帳號確認 Dialog 狀態
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
-    // ★ 新增：使用說明 Dialog 狀態
+    // 使用說明 Dialog 狀態
     var showHelpDialog by remember { mutableStateOf(false) }
 
     // 捲動狀態
@@ -79,6 +87,19 @@ fun SettingScreen(
         onResult = { uri ->
             if (uri != null) {
                 vm.updateUserAvatar(uri)
+            }
+        }
+    )
+
+    // ★ 新增：權限請求啟動器 (Android 13+)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                vm.updateReminderEnabled(true)
+            } else {
+                Toast.makeText(context, strings.msgPermissionRequired, Toast.LENGTH_LONG).show()
+                vm.updateReminderEnabled(false)
             }
         }
     )
@@ -239,6 +260,92 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
+                    // ★ 新增：每日提醒設定
+                    val timeStr = String.format(Locale.getDefault(), "%02d:%02d", vm.reminderHour, vm.reminderMinute)
+
+                    Column {
+                        Text(strings.labelReminder, color = SettingTextColor, fontSize = 14.sp, modifier = Modifier.padding(bottom = 4.dp))
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, SettingBorderColor, RoundedCornerShape(8.dp))
+                                .background(Color.White, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 16.dp, vertical = 6.dp) // 高度調小一點適應 Switch
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 點擊時間文字可開啟時間選擇器 (只有在啟用時)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable(enabled = vm.isReminderEnabled) {
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hour, minute ->
+                                                vm.setReminderTime(hour, minute)
+                                            },
+                                            vm.reminderHour,
+                                            vm.reminderMinute,
+                                            true // 24小時制
+                                        ).show()
+                                    }
+                                ) {
+                                    Icon(Icons.Outlined.Notifications, null, tint = if(vm.isReminderEnabled) SettingTextColor else Color.LightGray)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = timeStr,
+                                        fontSize = 18.sp,
+                                        color = if(vm.isReminderEnabled) SettingTextColor else Color.LightGray
+                                    )
+                                }
+
+                                Switch(
+                                    checked = vm.isReminderEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked) {
+                                            // 檢查權限 (Android 13+)
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                                                    vm.updateReminderEnabled(true)
+                                                } else {
+                                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                }
+                                            } else {
+                                                vm.updateReminderEnabled(true)
+                                            }
+                                        } else {
+                                            vm.updateReminderEnabled(false)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ★ 新增：測試按鈕 (僅供除錯用，如果不需要可自行註解掉)
+                    if (vm.isReminderEnabled) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    // 模擬發送廣播，立即觸發接收器
+                                    val intent = android.content.Intent(context, com.example.accountbook.receiver.ReminderReceiver::class.java)
+                                    context.sendBroadcast(intent)
+                                    Toast.makeText(context, "已發送測試通知", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Text("立即測試發送通知", color = Color.Blue, fontSize = 14.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
                     // 匯出按鈕
                     SettingItemAction(label = strings.labelExport) {
                         vm.exportTransactionData(context)
@@ -250,7 +357,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // ★ 修改：使用說明按鈕事件
+                    // 使用說明按鈕事件
                     SettingItemAction(label = strings.labelHelp) {
                         showHelpDialog = true
                     }
@@ -392,7 +499,7 @@ fun SettingScreen(
         )
     }
 
-    // ★ 新增：使用說明 Dialog
+    // 使用說明 Dialog
     if (showHelpDialog) {
         AlertDialog(
             onDismissRequest = { showHelpDialog = false },

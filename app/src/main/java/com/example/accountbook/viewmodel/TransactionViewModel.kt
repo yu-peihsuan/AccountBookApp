@@ -1,6 +1,8 @@
 package com.example.accountbook.viewmodel
 
+import android.app.AlarmManager
 import android.app.Application
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -14,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import com.example.accountbook.data.DBHandler
+import com.example.accountbook.receiver.ReminderReceiver
 import java.io.File
 import java.io.FileWriter
 import java.io.Serializable
@@ -95,7 +98,12 @@ interface StringResources {
     val msgExportSuccess: String
     val msgExportFail: String
 
-    // ★ 新增：使用說明內容
+    // ★ 新增：提醒相關字串
+    val labelReminder: String
+    val labelReminderTime: String
+    val msgPermissionRequired: String
+
+    // 使用說明內容
     val helpTitle: String
     val helpContent: String
 }
@@ -172,6 +180,10 @@ object StringsZH : StringResources {
     override val msgExportFail = "匯出失敗"
 
     // ★ 新增
+    override val labelReminder = "每日記帳提醒"
+    override val labelReminderTime = "提醒時間"
+    override val msgPermissionRequired = "需開啟通知權限才能使用提醒功能"
+
     override val helpTitle = "使用說明"
     override val helpContent = """
         1. 記帳
@@ -188,6 +200,7 @@ object StringsZH : StringResources {
         - 修改名稱：點擊使用者名稱欄位，輸入新名稱後按確定。
         - 貨幣設定：點擊「貨幣符號」可切換台幣 (NT$)、美金 ($) 或日幣 (¥)。
         - 預算設定：設定「每月預算」，首頁上方會顯示預算剩餘額度。
+        - 記帳提醒：開啟後可設定每日固定時間通知，提醒您記得記帳。
 
         5. 資料管理
         - 匯出資料：將所有紀錄匯出成 CSV 檔案，可用 Excel 開啟。
@@ -267,6 +280,10 @@ object StringsEN : StringResources {
     override val msgExportFail = "Export Failed"
 
     // ★ 新增
+    override val labelReminder = "Daily Reminder"
+    override val labelReminderTime = "Reminder Time"
+    override val msgPermissionRequired = "Notification permission is required for reminders"
+
     override val helpTitle = "User Guide"
     override val helpContent = """
         1. Add Record
@@ -283,6 +300,7 @@ object StringsEN : StringResources {
         - Change Name: Tap your username to edit it.
         - Currency: Tap "Currency" to switch between NT$, $, or ¥.
         - Budget: Set your monthly budget. Home screen shows the remaining balance.
+        - Reminder: Enable to receive a notification at a specific time daily.
 
         5. Data Management
         - Export Data: Export all records to a CSV file.
@@ -290,8 +308,7 @@ object StringsEN : StringResources {
     """.trimIndent()
 }
 
-// ---------------- ViewModel (其餘部分保持不變) ----------------
-// ... (省略 TransactionViewModel 的其餘不變程式碼)
+// ---------------- ViewModel ----------------
 
 data class CustomCategory(val name: String, val key: String)
 
@@ -338,6 +355,14 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var currentUserId by mutableIntStateOf(-1)
         private set
 
+    // ★ 新增：提醒相關狀態
+    var isReminderEnabled by mutableStateOf(false)
+        private set
+    var reminderHour by mutableIntStateOf(20) // 預設晚上 8 點
+        private set
+    var reminderMinute by mutableIntStateOf(0)
+        private set
+
     val currentStrings: StringResources
         get() = if (language == "English") StringsEN else StringsZH
 
@@ -378,6 +403,103 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         val c = Calendar.getInstance()
         c.set(Calendar.DAY_OF_MONTH, 1)
         customStartDateMillis = c.timeInMillis
+    }
+
+    // ★ 修改：函式改名，避免與變數 isReminderEnabled 的自動 setter 衝突
+    fun updateReminderEnabled(enabled: Boolean) {
+        isReminderEnabled = enabled
+        prefs.edit().putBoolean("reminder_enabled", enabled).apply()
+
+        if (enabled) {
+            scheduleAlarm()
+        } else {
+            cancelAlarm()
+        }
+    }
+
+    // ★ 新增：設定提醒時間
+    fun setReminderTime(hour: Int, minute: Int) {
+        reminderHour = hour
+        reminderMinute = minute
+        prefs.edit()
+            .putInt("reminder_hour", hour)
+            .putInt("reminder_minute", minute)
+            .apply()
+
+        // 如果目前是啟用的，就重新排程
+        if (isReminderEnabled) {
+            scheduleAlarm()
+        }
+    }
+
+    // ★ 修改：使用 setExact 來確保時間準確 (測試用)
+    private fun scheduleAlarm() {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, ReminderReceiver::class.java)
+
+        // 注意：Flag 必須包含 FLAG_IMMUTABLE
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            100,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, reminderHour)
+            set(Calendar.MINUTE, reminderMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0) // 毫秒歸零
+
+            // 如果設定的時間比現在早，就設為明天 (例如現在 15:30，你設 15:29，就是明天)
+            if (timeInMillis <= System.currentTimeMillis()) {
+                add(Calendar.DATE, 1)
+            }
+        }
+
+        // 判斷權限 (Android 12+ 需要 SCHEDULE_EXACT_ALARM 權限才能用 setExact)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                // 如果沒有精確鬧鐘權限，退回使用 setExactAndAllowWhileIdle 或 setWindow
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+        } else {
+            // Android 11 以下
+            alarmManager.setExact(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                pendingIntent
+            )
+        }
+
+        // 提示使用者 (方便除錯)
+        val format = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.getDefault())
+        val timeStr = format.format(calendar.time)
+        // 您可以在 Logcat 看到這行，確認下次響鈴時間
+        android.util.Log.d("ALARM", "鬧鐘已設定於: $timeStr")
+    }
+
+    // ★ 私有：取消鬧鐘
+    private fun cancelAlarm() {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, ReminderReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            100,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
     }
 
     // 更新大頭照
@@ -893,5 +1015,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         budget = prefs.getInt("monthly_budget", 8000)
         currency = prefs.getString("currency_symbol", "NT$") ?: "NT$"
         language = prefs.getString("app_language", "中文(繁體)") ?: "中文(繁體)"
+
+        // ★ 讀取提醒設定
+        isReminderEnabled = prefs.getBoolean("reminder_enabled", false)
+        reminderHour = prefs.getInt("reminder_hour", 20)
+        reminderMinute = prefs.getInt("reminder_minute", 0)
     }
 }
