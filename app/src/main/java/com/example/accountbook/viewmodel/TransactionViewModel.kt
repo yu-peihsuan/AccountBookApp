@@ -6,6 +6,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -432,74 +434,66 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 修改：使用 setExact 來確保時間準確 (測試用)
+    // ★ 修改：使用 setRepeating (最穩定，不需額外權限，不會閃退)
     private fun scheduleAlarm() {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java)
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ReminderReceiver::class.java)
 
-        // 注意：Flag 必須包含 FLAG_IMMUTABLE
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            100,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+            // 注意：Flag 必須包含 FLAG_IMMUTABLE
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                100,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
 
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, reminderHour)
-            set(Calendar.MINUTE, reminderMinute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0) // 毫秒歸零
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, reminderHour)
+                set(Calendar.MINUTE, reminderMinute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
 
-            // 如果設定的時間比現在早，就設為明天 (例如現在 15:30，你設 15:29，就是明天)
-            if (timeInMillis <= System.currentTimeMillis()) {
-                add(Calendar.DATE, 1)
+                // 如果設定的時間比現在早，就設為明天 (例如現在 15:30，你設 15:29，就是明天)
+                if (timeInMillis <= System.currentTimeMillis()) {
+                    add(Calendar.DATE, 1)
+                }
             }
-        }
 
-        // 判斷權限 (Android 12+ 需要 SCHEDULE_EXACT_ALARM 權限才能用 setExact)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                // 如果沒有精確鬧鐘權限，退回使用 setExactAndAllowWhileIdle 或 setWindow
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-        } else {
-            // Android 11 以下
-            alarmManager.setExact(
+            // 使用 setRepeating 進行每日重複提醒
+            // 這是最安全的做法，不需要 SCHEDULE_EXACT_ALARM 權限，避免閃退
+            alarmManager.setRepeating(
                 AlarmManager.RTC_WAKEUP,
                 calendar.timeInMillis,
+                AlarmManager.INTERVAL_DAY,
                 pendingIntent
             )
-        }
 
-        // 提示使用者 (方便除錯)
-        val format = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.getDefault())
-        val timeStr = format.format(calendar.time)
-        // 您可以在 Logcat 看到這行，確認下次響鈴時間
-        android.util.Log.d("ALARM", "鬧鐘已設定於: $timeStr")
+            val format = SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
+            Log.d("ALARM", "鬧鐘已設定於: ${format.format(calendar.time)}")
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Log.e("ALARM", "設定鬧鐘時發生錯誤: ${e.message}")
+        }
     }
 
     // ★ 私有：取消鬧鐘
     private fun cancelAlarm() {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            100,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        alarmManager.cancel(pendingIntent)
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ReminderReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                100,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            Log.d("ALARM", "鬧鐘已取消")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // 更新大頭照
