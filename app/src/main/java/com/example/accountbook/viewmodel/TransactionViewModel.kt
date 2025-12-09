@@ -82,10 +82,7 @@ interface StringResources {
     val labelCurrency: String
     val labelBudget: String
     val labelExport: String
-    val labelLanguage: String
     val labelHelp: String
-    val optionTraditionalChinese: String
-    val optionEnglish: String
     val chartTitle: String
     val chartPie: String
     val chartBar: String
@@ -100,7 +97,7 @@ interface StringResources {
     val msgExportSuccess: String
     val msgExportFail: String
 
-    // ★ 新增：提醒相關字串
+    // 提醒相關字串
     val labelReminder: String
     val labelReminderTime: String
     val msgPermissionRequired: String
@@ -164,10 +161,7 @@ object StringsZH : StringResources {
     override val labelCurrency = "貨幣符號"
     override val labelBudget = "每月預算設定"
     override val labelExport = "資料匯出"
-    override val labelLanguage = "語言"
     override val labelHelp = "使用說明"
-    override val optionTraditionalChinese = "中文(繁體)"
-    override val optionEnglish = "English"
     override val chartTitle = "圖表分析"
     override val chartPie = "支出分類 (圓餅圖)"
     override val chartBar = "近期每日支出 (長條圖)"
@@ -181,7 +175,6 @@ object StringsZH : StringResources {
     override val msgExportSuccess = "匯出成功"
     override val msgExportFail = "匯出失敗"
 
-    // ★ 新增
     override val labelReminder = "每日記帳提醒"
     override val labelReminderTime = "提醒時間"
     override val msgPermissionRequired = "需開啟通知權限才能使用提醒功能"
@@ -207,106 +200,6 @@ object StringsZH : StringResources {
         5. 資料管理
         - 匯出資料：將所有紀錄匯出成 CSV 檔案，可用 Excel 開啟。
         - 刪除帳號：永久刪除此帳號與所有資料，此動作無法復原。
-    """.trimIndent()
-}
-
-object StringsEN : StringResources {
-    override val loginTitle = "Login"
-    override val registerTitle = "Register"
-    override val fieldName = "Name"
-    override val fieldEmail = "Email"
-    override val fieldPassword = "Password"
-    override val btnLogin = "Login"
-    override val btnRegister = "Sign Up"
-    override val switchRegister = "No account? Sign up here"
-    override val switchLogin = "Have an account? Login here"
-    override val errorEmptyField = "Fields cannot be empty"
-    override val errorLoginFailed = "Login failed, check credentials"
-    override val tabExpense = "Expense"
-    override val tabIncome = "Income"
-    override val balance = "Balance"
-    override val budget = "Budget"
-    override val remain = "Remain"
-    override val historyTitle = "History"
-    override val menuHome = "History"
-    override val menuAdd = "Add Record"
-    override val menuChart = "Analysis"
-    override val menuSetting = "Settings"
-    override val menuLogout = "Logout"
-    override val inputNote = "Add a note"
-    override val btnDone = "Done"
-    override val btnConfirm = "OK"
-    override val btnCancel = "Cancel"
-    // Expense
-    override val categoryBreakfast = "Breakfast"
-    override val categoryLunch = "Lunch"
-    override val categoryDinner = "Dinner"
-    override val categoryDrink = "Drink"
-    override val categorySnack = "Snack"
-    override val categoryTraffic = "Traffic"
-    override val categoryShopping = "Shopping"
-    override val categoryDaily = "Daily"
-    override val categoryEntertainment = "Fun"
-    override val categoryRent = "Rent"
-    override val categoryBills = "Bills"
-    override val categoryOther = "Other"
-    // Income
-    override val categorySalary = "Salary"
-    override val categoryBonus = "Bonus"
-    override val categoryRewards = "Rewards"
-
-    override val categoryAdd = "Add"
-    override val settingTitle = "Settings"
-    override val sectionAccount = "Account"
-    override val labelAccount = "Email"
-    override val labelName = "Username"
-    override val sectionFunction = "Functions"
-    override val labelCurrency = "Currency"
-    override val labelBudget = "Monthly Budget"
-    override val labelExport = "Export Data"
-    override val labelLanguage = "Language"
-    override val labelHelp = "Help"
-    override val optionTraditionalChinese = "Traditional Chinese"
-    override val optionEnglish = "English"
-    override val chartTitle = "Analysis"
-    override val chartPie = "Expense by Category (Pie Chart)"
-    override val chartBar = "Daily Expenses (Bar Chart)"
-    override val dateFormat = "MM/dd/yyyy"
-    override val dayFormat = "EEEE"
-
-    override val labelDeleteAccount = "Delete Account"
-    override val titleDeleteConfirm = "Delete Account"
-    override val msgDeleteConfirm = "Are you sure you want to delete your account? This action cannot be undone and all data will be lost."
-    override val btnDelete = "Delete"
-    override val msgExportSuccess = "Export Successful"
-    override val msgExportFail = "Export Failed"
-
-    // ★ 新增
-    override val labelReminder = "Daily Reminder"
-    override val labelReminderTime = "Reminder Time"
-    override val msgPermissionRequired = "Notification permission is required for reminders"
-
-    override val helpTitle = "User Guide"
-    override val helpContent = """
-        1. Add Record
-        Tap "Add Record" or the "+" button. Enter amount, select category/date, and save.
-
-        2. View History
-        Check "History" for all transactions. Tap an item to edit or delete it.
-
-        3. Analysis
-        View Pie/Bar charts in "Analysis". Switch between Month/Year/Custom range at the top.
-
-        4. Account & Settings
-        - Change Avatar: Tap the avatar icon in Settings to pick a photo.
-        - Change Name: Tap your username to edit it.
-        - Currency: Tap "Currency" to switch between NT$, $, or ¥.
-        - Budget: Set your monthly budget. Home screen shows the remaining balance.
-        - Reminder: Enable to receive a notification at a specific time daily.
-
-        5. Data Management
-        - Export Data: Export all records to a CSV file.
-        - Delete Account: Permanently delete your account and data.
     """.trimIndent()
 }
 
@@ -341,8 +234,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var currency by mutableStateOf("NT$")
         private set
-    var language by mutableStateOf("中文(繁體)")
-        private set
+
+    // ★ 移除 language 變數，直接使用中文資源
+    val currentStrings: StringResources = StringsZH
 
     var userName by mutableStateOf("")
         private set
@@ -357,16 +251,13 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var currentUserId by mutableIntStateOf(-1)
         private set
 
-    // ★ 新增：提醒相關狀態
+    // 提醒相關狀態
     var isReminderEnabled by mutableStateOf(false)
         private set
     var reminderHour by mutableIntStateOf(20) // 預設晚上 8 點
         private set
     var reminderMinute by mutableIntStateOf(0)
         private set
-
-    val currentStrings: StringResources
-        get() = if (language == "English") StringsEN else StringsZH
 
     private val _transactions = mutableStateListOf<Transaction>()
     val transactions: List<Transaction> get() = _transactions
@@ -407,7 +298,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         customStartDateMillis = c.timeInMillis
     }
 
-    // ★ 修改：函式改名，避免與變數 isReminderEnabled 的自動 setter 衝突
     fun updateReminderEnabled(enabled: Boolean) {
         isReminderEnabled = enabled
         prefs.edit().putBoolean("reminder_enabled", enabled).apply()
@@ -419,7 +309,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 新增：設定提醒時間
     fun setReminderTime(hour: Int, minute: Int) {
         reminderHour = hour
         reminderMinute = minute
@@ -428,13 +317,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             .putInt("reminder_minute", minute)
             .apply()
 
-        // 如果目前是啟用的，就重新排程
         if (isReminderEnabled) {
             scheduleAlarm()
         }
     }
 
-    // ★ 修改：使用 setRepeating (最穩定，不需額外權限，不會閃退)
     private fun scheduleAlarm() {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -454,14 +341,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
 
-                // 如果設定的時間比現在早，就設為明天 (例如現在 15:30，你設 15:29，就是明天)
+                // 如果設定的時間比現在早，就設為明天
                 if (timeInMillis <= System.currentTimeMillis()) {
                     add(Calendar.DATE, 1)
                 }
             }
 
-            // 使用 setRepeating 進行每日重複提醒
-            // 這是最安全的做法，不需要 SCHEDULE_EXACT_ALARM 權限，避免閃退
             alarmManager.setRepeating(
                 AlarmManager.RTC_WAKEUP,
                 calendar.timeInMillis,
@@ -478,7 +363,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 私有：取消鬧鐘
     private fun cancelAlarm() {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -496,12 +380,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // 更新大頭照
     fun updateUserAvatar(uri: Uri) {
         if (currentUserId == -1) return
 
         try {
-            // 1. 將圖片複製到 App 內部儲存空間
             val inputStream = context.contentResolver.openInputStream(uri)
             val fileName = "avatar_${currentUserId}_${System.currentTimeMillis()}.jpg"
             val file = File(context.filesDir, fileName)
@@ -512,10 +394,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             }
             val newPath = file.absolutePath
 
-            // 2. 更新資料庫
             dbHandler.updateUserAvatar(currentUserId, newPath)
 
-            // 3. 更新 Prefs 和 State
             prefs.edit().putString("user_avatar", newPath).apply()
             userAvatar = newPath
         } catch (e: Exception) {
@@ -523,26 +403,21 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // 新增：修改使用者名稱
     fun updateUserName(newName: String): String {
         if (currentUserId == -1) return "尚未登入"
         if (newName.isBlank()) return "名稱不能為空"
-        // 如果跟原本的一樣，就直接回傳成功，不用查 DB
         if (newName == userName) return ""
 
-        // 檢查是否重複
         if (dbHandler.checkUserExists(newName)) {
             return "此名稱已被使用"
         }
 
-        // 更新 DB
         dbHandler.updateUserName(currentUserId, newName)
 
-        // 更新 State & Prefs
         userName = newName
         prefs.edit().putString("user_name", newName).apply()
 
-        return "" // 回傳空字串代表成功
+        return ""
     }
 
     fun applyQuickRange(rangeType: String) {
@@ -606,7 +481,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 .putInt("user_id", newUserId.toInt())
                 .putString("user_name", name)
                 .putString("user_email", email)
-                .putString("user_avatar", "") // 註冊時預設無大頭照
+                .putString("user_avatar", "")
                 .putBoolean("is_logged_in", true)
                 .apply()
 
@@ -628,7 +503,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
         if (userInfo != null) {
             val (id, name) = userInfo
-            // 登入成功後，從 DB 讀取大頭照路徑
             val avatarPath = dbHandler.getUserAvatar(id)
 
             prefs.edit()
@@ -673,13 +547,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         isLoggedIn = false
         userName = ""
         userEmail = ""
-        userAvatar = "" // 清空
+        userAvatar = ""
         currentUserId = -1
         _transactions.clear()
         customCategories.clear()
     }
 
-    // ★ 新增：刪除當前帳號
     fun deleteCurrentAccount() {
         if (currentUserId != -1) {
             dbHandler.deleteUserData(currentUserId)
@@ -687,7 +560,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // ★ 修改：匯出所有資料 (包含使用者資訊、設定、自訂分類、交易紀錄)
     fun exportTransactionData(context: Context) {
         if (currentUserId == -1) return
 
@@ -696,48 +568,38 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             val file = File(context.cacheDir, fileName)
             val writer = FileWriter(file)
 
-            // 1. 寫入 BOM (\uFEFF) 以防止 Excel 中文亂碼
-            writer.append("\uFEFF")
+            writer.append("\uFEFF") // BOM for Excel
 
-            // ==========================================
-            //區塊 1: 使用者資訊與設定
-            // ==========================================
+            // User Info
             writer.append("--- User Profile & Settings ---\n")
             writer.append("Item,Value\n")
             writer.append("User Name,${userName}\n")
-            writer.append("User Email,${userEmail}\n") // 帳號
+            writer.append("User Email,${userEmail}\n")
             writer.append("Budget,${budget}\n")
             writer.append("Currency,${currency}\n")
-            writer.append("Language,${language}\n")
-            writer.append("\n") // 空一行分隔
+            writer.append("Language,中文(繁體)\n")
+            writer.append("\n")
 
-            // ==========================================
-            // 區塊 2: 自訂分類
-            // ==========================================
+            // Categories
             writer.append("--- Custom Categories ---\n")
             val categories = dbHandler.getCategories(currentUserId)
             if (categories.isNotEmpty()) {
                 writer.append("Category Name,Key\n")
                 for (cat in categories) {
-                    // cat.first 是名稱, cat.second 是 key
                     writer.append("${cat.first},${cat.second}\n")
                 }
             } else {
                 writer.append("(No Custom Categories)\n")
             }
-            writer.append("\n") // 空一行分隔
+            writer.append("\n")
 
-            // ==========================================
-            // 區塊 3: 交易紀錄
-            // ==========================================
+            // Transactions
             writer.append("--- Transactions ---\n")
             writer.append("Date,Day,Type,Category,Item,Amount\n")
 
             val transactions = dbHandler.getAllTransactions(currentUserId)
             for (tx in transactions) {
                 val categoryName = getCategoryName(tx.categoryKey)
-
-                // 清理文字中的逗號與換行，避免 CSV 格式跑掉
                 val cleanTitle = tx.title.replace(",", " ").replace("\n", " ")
                 val cleanCategory = categoryName.replace(",", " ")
 
@@ -747,7 +609,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             writer.flush()
             writer.close()
 
-            // 呼叫系統分享
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/csv"
@@ -772,11 +633,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         prefs.edit().putString("currency_symbol", newCurrency).apply()
     }
 
-    fun updateLanguage(newLang: String) {
-        language = newLang
-        prefs.edit().putString("app_language", newLang).apply()
-    }
-
     fun loadCategories() {
         if (currentUserId == -1) return
         val list = dbHandler.getCategories(currentUserId)
@@ -797,8 +653,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun addTransaction(title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
         if (currentUserId == -1) return
 
-        val formatD = SimpleDateFormat(currentStrings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
-        val formatW = SimpleDateFormat(currentStrings.dayFormat, if(language=="English") Locale.US else Locale.TAIWAN)
+        // ★ 固定使用台灣 Locale
+        val formatD = SimpleDateFormat(currentStrings.dateFormat, Locale.TAIWAN)
+        val formatW = SimpleDateFormat(currentStrings.dayFormat, Locale.TAIWAN)
 
         val dateStr = formatD.format(dateMillis)
         val dayStr = formatW.format(dateMillis)
@@ -808,8 +665,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateTransaction(id: Long, title: String, amount: Int, type: String, dateMillis: Long, categoryKey: String) {
-        val formatD = SimpleDateFormat(currentStrings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
-        val formatW = SimpleDateFormat(currentStrings.dayFormat, if(language=="English") Locale.US else Locale.TAIWAN)
+        // ★ 固定使用台灣 Locale
+        val formatD = SimpleDateFormat(currentStrings.dateFormat, Locale.TAIWAN)
+        val formatW = SimpleDateFormat(currentStrings.dayFormat, Locale.TAIWAN)
 
         val dateStr = formatD.format(dateMillis)
         val dayStr = formatW.format(dateMillis)
@@ -1008,9 +866,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private fun loadSettings() {
         budget = prefs.getInt("monthly_budget", 8000)
         currency = prefs.getString("currency_symbol", "NT$") ?: "NT$"
-        language = prefs.getString("app_language", "中文(繁體)") ?: "中文(繁體)"
+        // 語言設定不再讀取，預設中文
 
-        // ★ 讀取提醒設定
         isReminderEnabled = prefs.getBoolean("reminder_enabled", false)
         reminderHour = prefs.getInt("reminder_hour", 20)
         reminderMinute = prefs.getInt("reminder_minute", 0)

@@ -29,8 +29,8 @@ fun MonthPickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int, Int) -> Unit
 ) {
-    // 年份範圍 (前後 10 年)
-    val years = (year - 10..year + 10).toList()
+    // 年份範圍 (前後 100 年)
+    val years = (year - 100..year + 100).toList()
     val months = (1..12).toList()
 
     // 初始索引
@@ -45,11 +45,11 @@ fun MonthPickerDialog(
         containerColor = Color.White,
         title = {
             Text(
-                if (showMonth) "選擇月份" else "選擇年份",
+                if (showMonth) "選擇年月" else "選擇年份",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp // ★ 標題字體調小
+                fontSize = 20.sp
             )
         },
         text = {
@@ -88,8 +88,7 @@ fun MonthPickerDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(selectedYear, selectedMonth) },
-                //colors = ButtonDefaults.textButtonColors(contentColor = accentColor)
+                onClick = { onConfirm(selectedYear, selectedMonth) }
             ) {
                 Text("確定")
             }
@@ -129,7 +128,6 @@ fun <T> WheelPicker(
         modifier = modifier.height(itemHeight * visibleCount),
         contentAlignment = Alignment.Center
     ) {
-        // 選中項目的背景高亮
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -154,7 +152,7 @@ fun <T> WheelPicker(
                 ) {
                     Text(
                         text = item.toString(),
-                        fontSize = 20.sp, // ★ 滾輪數字調小為 18.sp
+                        fontSize = 20.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = if (isSelected) Color.Black else Color.Gray
                     )

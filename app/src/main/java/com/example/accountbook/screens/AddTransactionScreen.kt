@@ -48,12 +48,12 @@ fun AddTransactionScreen(
 ) {
     val strings = vm.currentStrings
     val currency = vm.currency
-    val language = vm.language
 
     // 判斷是否為編輯模式
     val isEditMode = transactionId != -1L
 
-    var type by remember { mutableStateOf(if(language=="English") "Expense" else "支出") }
+    // ★ 預設固定為「支出」
+    var type by remember { mutableStateOf("支出") }
     // 預設選擇
     var selectedCategoryKey by remember { mutableStateOf("breakfast") }
     var amount by remember { mutableStateOf("0") }
@@ -70,13 +70,19 @@ fun AddTransactionScreen(
         if (isEditMode) {
             val tx = vm.getTransactionById(transactionId)
             if (tx != null) {
-                type = tx.type
+                // ★ 相容性處理：若舊資料為英文，轉換為中文顯示
+                type = when(tx.type) {
+                    "Expense" -> "支出"
+                    "Income" -> "收入"
+                    else -> tx.type
+                }
                 selectedCategoryKey = tx.categoryKey
                 amount = tx.amount.toString()
                 note = tx.title
 
                 try {
-                    val format = SimpleDateFormat(strings.dateFormat, if(language=="English") Locale.US else Locale.TAIWAN)
+                    // ★ 固定使用 Locale.TAIWAN
+                    val format = SimpleDateFormat(strings.dateFormat, Locale.TAIWAN)
                     val dateObj = format.parse(tx.date)
                     if (dateObj != null) {
                         dateMillis = dateObj.time
@@ -89,8 +95,8 @@ fun AddTransactionScreen(
     }
 
     fun formatDate(millis: Long): String {
-        val format = SimpleDateFormat("${strings.dateFormat} ${strings.dayFormat}",
-            if(language=="English") Locale.US else Locale.TAIWAN)
+        // ★ 固定使用 Locale.TAIWAN
+        val format = SimpleDateFormat("${strings.dateFormat} ${strings.dayFormat}", Locale.TAIWAN)
         return format.format(Date(millis))
     }
 
@@ -129,6 +135,7 @@ fun AddTransactionScreen(
 
     // ★ 根據目前的 type 切換顯示的列表
     val displayCategories = remember(customCategoryList, strings, type) {
+        // 使用 "Expense" 是為了相容性，但 UI 主要操作是 "支出"
         val baseList = if (type == "支出" || type == "Expense") expenseCategories else incomeCategories
         val customItems = customCategoryList.map {
             CategoryItem(it.name, Icons.Filled.Face, it.key)
@@ -205,7 +212,7 @@ fun AddTransactionScreen(
                 }
 
                 Box(Modifier.align(Alignment.Center)) {
-                    // ★ 切換 Type 時，預設選取列表的第一個項目 (避免選取到不屬於該 Type 的 key)
+                    // ★ 切換 Type 時，預設選取列表的第一個項目
                     TypeSegmentedControl(type, strings) { newType ->
                         type = newType
                         // 切換時重置選擇，避免 Key 不存在

@@ -91,7 +91,7 @@ fun SettingScreen(
         }
     )
 
-    // ★ 新增：權限請求啟動器 (Android 13+)
+    // 權限請求啟動器 (Android 13+)
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
@@ -260,7 +260,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // ★ 新增：每日提醒設定
+                    // 每日提醒設定
                     val timeStr = String.format(Locale.getDefault(), "%02d:%02d", vm.reminderHour, vm.reminderMinute)
 
                     Column {
@@ -326,7 +326,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // ★ 新增：測試按鈕 (僅供除錯用，如果不需要可自行註解掉)
+                    // 測試按鈕 (僅供除錯用，如果不需要可自行註解掉)
                     if (vm.isReminderEnabled) {
                         Box(
                             Modifier
@@ -353,9 +353,7 @@ fun SettingScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    SettingItemDisplay(label = strings.labelLanguage, value = "中文(繁體)")
-
-                    Spacer(Modifier.height(12.dp))
+                    // ★ 移除語言顯示欄位
 
                     // 使用說明按鈕事件
                     SettingItemAction(label = strings.labelHelp) {
