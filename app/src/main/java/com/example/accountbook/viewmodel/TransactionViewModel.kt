@@ -325,9 +325,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private fun scheduleAlarm() {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(context, ReminderReceiver::class.java)
 
-            // 注意：Flag 必須包含 FLAG_IMMUTABLE
+            val intent = Intent(context, ReminderReceiver::class.java)
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 100,
@@ -341,27 +340,47 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
 
-                // 如果設定的時間比現在早，就設為明天
                 if (timeInMillis <= System.currentTimeMillis()) {
                     add(Calendar.DATE, 1)
                 }
             }
 
-            alarmManager.setRepeating(
+            // Android 12+ 精準鬧鐘權限
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+
+                    val intentSetting =
+                        Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    context.startActivity(intentSetting)
+
+                    Toast.makeText(
+                        context,
+                        "請允許『精準鬧鐘』才能使用每日提醒",
+                        Toast.LENGTH_LONG
+                    ).show()
+
+                    Log.e("ALARM", "沒有精準鬧鐘權限，鬧鐘未設定")
+                    return
+                }
+            }
+
+            alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 calendar.timeInMillis,
-                AlarmManager.INTERVAL_DAY,
                 pendingIntent
             )
 
-            val format = SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
-            Log.d("ALARM", "鬧鐘已設定於: ${format.format(calendar.time)}")
+            Log.d("ALARM", "已設定鬧鐘於 ${calendar.time}")
 
         } catch (e: Exception) {
             e.printStackTrace()
-            Log.e("ALARM", "設定鬧鐘時發生錯誤: ${e.message}")
+            Log.e("ALARM", "設定鬧鐘發生錯誤：${e.message}")
         }
     }
+
 
     private fun cancelAlarm() {
         try {
@@ -374,11 +393,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             alarmManager.cancel(pendingIntent)
-            Log.d("ALARM", "鬧鐘已取消")
+            Log.d("ALARM", "鬧鐘取消")
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+
 
     fun updateUserAvatar(uri: Uri) {
         if (currentUserId == -1) return

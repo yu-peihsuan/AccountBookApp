@@ -45,6 +45,7 @@ import com.example.accountbook.viewmodel.TransactionViewModel
 import java.io.File
 import java.util.Locale
 
+
 val SettingBgColor = Color(0xFFFDFBF7)
 
 val SettingTopBarColor = Color(0xFFFCF5E8)
