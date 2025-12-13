@@ -159,7 +159,7 @@ class DBHandler(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_
         return avatarPath
     }
 
-    // ★ 新增：刪除使用者所有資料 (交易、分類、帳號)
+    // 刪除使用者所有資料 (交易、分類、帳號)
     fun deleteUserData(userId: Int) {
         val db = this.writableDatabase
         db.beginTransaction()

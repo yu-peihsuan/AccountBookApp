@@ -52,10 +52,10 @@ fun AddTransactionScreen(
     // 判斷是否為編輯模式
     val isEditMode = transactionId != -1L
 
-    // ★ 預設固定為「支出」
+    // 預設固定為「支出」
     var type by remember { mutableStateOf("支出") }
     // 預設選擇
-    var selectedCategoryKey by remember { mutableStateOf("breakfast") }
+    var selectedCategoryKey by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("0") }
     var note by remember { mutableStateOf("") }
     var dateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -70,7 +70,6 @@ fun AddTransactionScreen(
         if (isEditMode) {
             val tx = vm.getTransactionById(transactionId)
             if (tx != null) {
-                // ★ 相容性處理：若舊資料為英文，轉換為中文顯示
                 type = when(tx.type) {
                     "Expense" -> "支出"
                     "Income" -> "收入"
@@ -81,7 +80,6 @@ fun AddTransactionScreen(
                 note = tx.title
 
                 try {
-                    // ★ 固定使用 Locale.TAIWAN
                     val format = SimpleDateFormat(strings.dateFormat, Locale.TAIWAN)
                     val dateObj = format.parse(tx.date)
                     if (dateObj != null) {
@@ -95,7 +93,6 @@ fun AddTransactionScreen(
     }
 
     fun formatDate(millis: Long): String {
-        // ★ 固定使用 Locale.TAIWAN
         val format = SimpleDateFormat("${strings.dateFormat} ${strings.dayFormat}", Locale.TAIWAN)
         return format.format(Date(millis))
     }
@@ -107,29 +104,31 @@ fun AddTransactionScreen(
         dateMillis = calendar.timeInMillis
     }
 
-    // ★ 定義支出類別列表
+    // ★ 定義支出類別列表 (已更新 Icon)
     val expenseCategories = listOf(
-        CategoryItem(strings.categoryBreakfast, Icons.Filled.Star, "breakfast"),
-        CategoryItem(strings.categoryLunch, Icons.Filled.Face, "lunch"),
-        CategoryItem(strings.categoryDinner, Icons.Filled.Favorite, "dinner"),
-        CategoryItem(strings.categoryDrink, Icons.Filled.CheckCircle, "drink"),
-        CategoryItem(strings.categorySnack, Icons.Filled.Face, "snack"), // 點心
-        CategoryItem(strings.categoryTraffic, Icons.Filled.Share, "traffic"),
-        CategoryItem(strings.categoryShopping, Icons.Filled.ShoppingCart, "shopping"),
-        CategoryItem(strings.categoryDaily, Icons.Filled.ThumbUp, "daily"),
+        CategoryItem(strings.categoryBreakfast, Icons.Filled.FreeBreakfast, "breakfast"),
+        CategoryItem(strings.categoryLunch, Icons.Filled.LunchDining, "lunch"),
+        CategoryItem(strings.categoryDinner, Icons.Filled.Restaurant, "dinner"),
+        CategoryItem(strings.categoryDrink, Icons.Filled.LocalCafe, "drink"),
+        CategoryItem(strings.categorySnack, Icons.Filled.Cookie, "snack"),
+        CategoryItem(strings.categoryTraffic, Icons.Filled.DirectionsCar, "traffic"),
+        CategoryItem(strings.categoryShopping, Icons.Filled.ShoppingBag, "shopping"),
+        CategoryItem(strings.categoryDaily, Icons.Filled.LocalGroceryStore, "daily"),
         CategoryItem(strings.categoryRent, Icons.Filled.Home, "rent"),
-        CategoryItem(strings.categoryEntertainment, Icons.Filled.Face, "entertainment"),
-        CategoryItem(strings.categoryBills, Icons.Filled.Warning, "bills"),
-        CategoryItem(strings.categoryOther, Icons.Filled.Menu, "other")
+        CategoryItem(strings.categoryEntertainment, Icons.Filled.SportsEsports, "entertainment"),
+        CategoryItem(strings.categoryBills, Icons.Filled.ReceiptLong, "bills"),
+        CategoryItem(strings.categoryOther, Icons.Filled.MoreHoriz, "other")
     )
 
-    // ★ 定義收入類別列表
+    // ★ 定義收入類別列表 (已更新 Icon)
     val incomeCategories = listOf(
-        CategoryItem(strings.categorySalary, Icons.Filled.ThumbUp, "salary"), // 薪水
-        CategoryItem(strings.categoryBonus, Icons.Filled.Star, "bonus"),     // 獎金
-        CategoryItem(strings.categoryRewards, Icons.Filled.Favorite, "rewards"), // 回饋
-        CategoryItem(strings.categoryOther, Icons.Filled.Menu, "other")
+        CategoryItem(strings.categorySalary, Icons.Filled.AttachMoney, "salary"),
+        CategoryItem(strings.categoryBonus, Icons.Filled.EmojiEvents, "bonus"),
+        CategoryItem(strings.categoryRewards, Icons.Filled.Redeem, "rewards"),
+        CategoryItem(strings.categoryInvoice, Icons.Filled.Receipt, "invoice"),
+        CategoryItem(strings.categoryOther, Icons.Filled.MoreHoriz, "other")
     )
+
 
     val customCategoryList = vm.customCategories.toList()
 
@@ -138,7 +137,7 @@ fun AddTransactionScreen(
         // 使用 "Expense" 是為了相容性，但 UI 主要操作是 "支出"
         val baseList = if (type == "支出" || type == "Expense") expenseCategories else incomeCategories
         val customItems = customCategoryList.map {
-            CategoryItem(it.name, Icons.Filled.Face, it.key)
+            CategoryItem(it.name, Icons.Filled.Label, it.key)
         }
         // 在列表最後加上「新增」按鈕
         baseList + customItems + CategoryItem(strings.categoryAdd, Icons.Filled.Add, "add")
@@ -217,9 +216,9 @@ fun AddTransactionScreen(
                         type = newType
                         // 切換時重置選擇，避免 Key 不存在
                         if (newType == "支出" || newType == "Expense") {
-                            selectedCategoryKey = "breakfast"
+                            selectedCategoryKey = ""
                         } else {
-                            selectedCategoryKey = "salary"
+                            selectedCategoryKey = ""
                         }
                     }
                 }

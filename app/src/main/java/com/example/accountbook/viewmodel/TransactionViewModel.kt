@@ -29,6 +29,7 @@ import java.util.Locale
 
 // ---------------- 多語系資源定義 ----------------
 interface StringResources {
+    val categoryInvoice: String
     val loginTitle: String
     val registerTitle: String
     val fieldName: String
@@ -151,6 +152,7 @@ object StringsZH : StringResources {
     override val categorySalary = "薪水"
     override val categoryBonus = "獎金"
     override val categoryRewards = "回饋"
+    override val categoryInvoice = "發票"
 
     override val categoryAdd = "新增分類"
     override val settingTitle = "設定"
@@ -483,6 +485,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             "bills" -> s.categoryBills
             "other" -> s.categoryOther
             "salary" -> s.categorySalary
+            "invoice" -> s.categoryInvoice
             "bonus" -> s.categoryBonus
             "rewards" -> s.categoryRewards
             "add" -> s.categoryAdd

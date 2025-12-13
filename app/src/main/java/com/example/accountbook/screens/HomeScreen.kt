@@ -284,14 +284,31 @@ fun DayRecord(
 }
 
 fun getIconByKey(key: String): ImageVector {
-    return when {
-        key.contains("traffic") || key.contains("交通") -> Icons.Default.Place
-        key.contains("lunch") || key.contains("dinner") || key.contains("breakfast") || key.contains("食") -> Icons.Default.Star
-        key.contains("drink") || key.contains("飲") -> Icons.Default.Face
-        key.contains("shopping") || key.contains("購") -> Icons.Default.ShoppingCart
-        key.contains("bills") || key.contains("電") -> Icons.Default.Phone
-        key.contains("rent") || key.contains("房") -> Icons.Default.Home
-        else -> Icons.Default.Home
+    return when (key) {
+        // ===================================
+        // ★ 1. 精確比對 (對應 AddTransactionScreen 的 Key)
+        // ===================================
+
+        // --- 支出 ---
+        "breakfast" -> Icons.Filled.FreeBreakfast
+        "lunch" -> Icons.Filled.LunchDining
+        "dinner" -> Icons.Filled.Restaurant
+        "drink" -> Icons.Filled.LocalBar
+        "snack" -> Icons.Filled.Cookie
+        "traffic" -> Icons.Filled.DirectionsCar
+        "shopping" -> Icons.Filled.ShoppingBag
+        "daily" -> Icons.Filled.LocalGroceryStore
+        "rent" -> Icons.Filled.Home
+        "entertainment" -> Icons.Filled.SportsEsports
+        "bills" -> Icons.Filled.ReceiptLong
+        "other" -> Icons.Filled.MoreHoriz
+
+        // --- 收入 ---
+        "salary" -> Icons.Filled.AttachMoney
+        "bonus" -> Icons.Filled.EmojiEvents
+        "rewards" -> Icons.Filled.Redeem
+
+        else -> Icons.Filled.Label // 剩下的都顯示標籤圖示
     }
 }
 
