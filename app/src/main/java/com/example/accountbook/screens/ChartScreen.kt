@@ -55,7 +55,7 @@ fun getCategoryColor(key: String): Color {
         "lunch" -> Color(0xFFFFB74D)
         "dinner" -> Color(0xFFFF8A65)
         "drink" -> Color(0xFF4DD0E1)
-        "snack" -> Color(0xFFFFD180)    // 點心
+        "snack" -> Color(0xFFFFD180)
         "traffic" -> Color(0xFF64B5F6)
         "shopping" -> Color(0xFFF06292)
         "daily" -> Color(0xFF81C784)
@@ -65,9 +65,9 @@ fun getCategoryColor(key: String): Color {
         "other" -> Color(0xFFA1887F)
 
         // 收入
-        "salary" -> Color(0xFF4DB6AC)   // 薪水 (Teal)
-        "bonus" -> Color(0xFFE57373)    // 獎金 (Red/Pink)
-        "rewards" -> Color(0xFF9575CD)  // 回饋 (Deep Purple)
+        "salary" -> Color(0xFF4DB6AC)
+        "bonus" -> Color(0xFFE57373)
+        "rewards" -> Color(0xFF9575CD)
 
         "add" -> Color.LightGray
         else -> Color.Gray

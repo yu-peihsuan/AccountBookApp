@@ -97,8 +97,6 @@ fun CategoryDetailScreen(
                 }
 
                 items(list) { (date, txList, _) ->
-                    // 這裡重複使用 HomeScreen 的 DayRecord 風格，但簡化一些
-                    // 直接 reuse DayRecord 太複雜，我們重寫一個簡單版
                     DetailDayGroup(date, txList, currency, vm, onEditTransaction)
                 }
 

@@ -39,20 +39,19 @@ val TextGray = Color(0xFF4A463F)
 fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: () -> Unit) {
 
     val strings = vm.currentStrings
-    val calendar = remember { Calendar.getInstance() }
-    var currentYear by remember { mutableIntStateOf(calendar.get(Calendar.YEAR)) }
-    var currentMonth by remember { mutableIntStateOf(calendar.get(Calendar.MONTH) + 1) }
 
+    // ★ 修改：移除原本的 local state，直接使用 vm.homeYear 和 vm.homeMonth
     var showMonthPicker by remember { mutableStateOf(false) }
 
     val allTransactions = vm.transactions
-    val filteredData = remember(allTransactions, currentYear, currentMonth) {
+    // ★ 修改：相依參數改為 vm.homeYear, vm.homeMonth
+    val filteredData = remember(allTransactions, vm.homeYear, vm.homeMonth) {
         allTransactions.filter { tx ->
             val parts = tx.date.split("/")
             if (parts.size >= 2) {
                 val y = parts[0].toIntOrNull()
                 val m = parts[1].toIntOrNull()
-                y == currentYear && m == currentMonth
+                y == vm.homeYear && m == vm.homeMonth // ★ 使用 vm
             } else false
         }
     }
@@ -82,13 +81,14 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
 
     if (showMonthPicker) {
         MonthPickerDialog(
-            year = currentYear,
-            month = currentMonth,
-            showMonth = true, // ★ 首頁固定顯示月份
+            year = vm.homeYear, // ★ 使用 vm
+            month = vm.homeMonth, // ★ 使用 vm
+            showMonth = true,
             onDismiss = { showMonthPicker = false },
             onConfirm = { y, m ->
-                currentYear = y
-                currentMonth = m
+                // ★ 修改：更新 vm 狀態
+                vm.homeYear = y
+                vm.homeMonth = m
                 showMonthPicker = false
             }
         )
@@ -108,7 +108,8 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
                     ) {
                         Icon(Icons.Default.DateRange, null, Modifier.size(18.dp), tint = TextGray)
                         Spacer(Modifier.width(8.dp))
-                        Text("${currentYear}/${currentMonth}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextGray)
+                        // ★ 修改：顯示 vm 的年份與月份
+                        Text("${vm.homeYear}/${vm.homeMonth}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextGray)
                         Icon(Icons.Default.ArrowDropDown, null, tint = TextGray)
                     }
                 },

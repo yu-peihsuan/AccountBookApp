@@ -52,7 +52,7 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // Logo 或標題
+
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -123,7 +123,7 @@ fun LoginScreen(
                         errorMessage = strings.errorEmptyField
                     } else {
                         if (isRegisterMode) {
-                            // ★ 修改：取得註冊結果
+                            // 取得註冊結果
                             val result = vm.register(name, email, password)
                             if (result.isEmpty()) {
                                 // 空字串代表成功

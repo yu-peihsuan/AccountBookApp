@@ -337,6 +337,12 @@ fun AddTransactionScreen(
                 handleAction = { finalAmount ->
                     val title = if (note.isNotEmpty()) note else ""
 
+                    // ★ 新增：更新首頁的年份與月份，使其跳轉到記帳日期的月份
+                    val c = Calendar.getInstance()
+                    c.timeInMillis = dateMillis
+                    vm.homeYear = c.get(Calendar.YEAR)
+                    vm.homeMonth = c.get(Calendar.MONTH) + 1
+
                     if (isEditMode) {
                         vm.updateTransaction(transactionId, title, finalAmount, type, dateMillis, selectedCategoryKey)
                     } else {

@@ -41,9 +41,9 @@ fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
 
         Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
 
-            //-- 使用者頭像 + 名稱橫向顯示
+            //使用者頭像、名稱橫向顯示
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // ★ 修改：顯示大頭照
+                // 顯示大頭照
                 if (vm.userAvatar.isNotEmpty()) {
                     AsyncImage(
                         model = File(vm.userAvatar),
@@ -80,7 +80,7 @@ fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
             }
         }
 
-        //-- 🔥 登出按鈕置底
+        //登出按鈕置底
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -97,7 +97,7 @@ fun DrawerMenu(vm: TransactionViewModel, onSelect:(String)->Unit) {
 
 @Composable
 fun DrawerItem(text:String, route:String, onSelect:(String)->Unit, bgColor: Color) {
-    // 圖片中的抽屜項目看起來像圓角按鈕
+    // 圓角按鈕
     Box(
         modifier = Modifier
             .fillMaxWidth()

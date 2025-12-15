@@ -267,6 +267,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     var customCategories = mutableStateListOf<CustomCategory>()
         private set
 
+    // --- Home Screen States (新增：控制首頁顯示的月份) ---
+    var homeYear by mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
+    var homeMonth by mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1)
+
     // --- Chart Screen States ---
     var chartYear by mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
     var chartMonth by mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1)

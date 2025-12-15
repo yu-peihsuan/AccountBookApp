@@ -57,7 +57,7 @@ fun SettingScreen(
     vm: TransactionViewModel,
     onBack: () -> Unit,
     onLogout: () -> Unit,
-    onOpenDrawer: () -> Unit // 選單抽屜觸發
+    onOpenDrawer: () -> Unit // 選單
 ) {
     val context = LocalContext.current
     val strings = vm.currentStrings
