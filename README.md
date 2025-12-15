@@ -1,6 +1,10 @@
 # AccountBook App (記帳本)
 
-這是一個基於 Android Jetpack Compose 開發的個人記帳應用程式。採用MVVM架構夠進行開發，將UI層和資料層分離，增加可讀性和可維護性。
+本專案採用 MVVM 架構，UI 層使用 Jetpack Compose 實作，
+所有畫面狀態由 ViewModel 管理，並透過 SQLite 作為本地資料來源，
+將 UI 與資料存取邏輯分離，提升程式碼可讀性與可維護性。
+
+
 
 ## 主要功能
 
@@ -26,16 +30,6 @@
     * **每日提醒**：可設定固定時間通知，養成記帳習慣。
     * **資料匯出**：支援將交易紀錄匯出為 CSV 檔案，方便於 Excel 查看。
     * **帳號管理**：支援使用者註冊、登入、修改頭像與暱稱。
-
-## 技術堆疊 (Tech Stack)
-
-* **語言**: Kotlin
-* **UI 框架**: Jetpack Compose(Material3 Design)
-* **架構**: MVVM (Model-View-ViewModel)
-* **資料儲存**: SQLite (Local Database)
-* **非同步處理**: Kotlin Coroutines
-* **導航**: Jetpack Navigation Compose
-* **依賴注入/其他**: AndroidX Lifecycle, ViewModel
 
 ## 應用程式截圖 (Screenshots)
 
