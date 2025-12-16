@@ -1,6 +1,6 @@
 # 記帳APP
 
-本專案採用 MVVM 架構，UI 層使用 Jetpack Compose 實作，
+本專案採用 MVVM(Model-View-ViewModel) 架構，UI 層使用 Jetpack Compose 實作，
 所有畫面狀態由 ViewModel 管理，並透過 SQLite 作為本地資料來源，
 將 UI 與資料存取邏輯分離，提升程式碼可讀性與可維護性。
 
