@@ -40,7 +40,7 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
 
     val strings = vm.currentStrings
 
-    // ★ 修改：移除原本的 local state，直接使用 vm.homeYear 和 vm.homeMonth
+    // 移除原本的 local state，直接使用 vm.homeYear 和 vm.homeMonth
     var showMonthPicker by remember { mutableStateOf(false) }
 
     val allTransactions = vm.transactions
@@ -51,7 +51,7 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
             if (parts.size >= 2) {
                 val y = parts[0].toIntOrNull()
                 val m = parts[1].toIntOrNull()
-                y == vm.homeYear && m == vm.homeMonth // ★ 使用 vm
+                y == vm.homeYear && m == vm.homeMonth // 使用 vm
             } else false
         }
     }
@@ -81,12 +81,12 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
 
     if (showMonthPicker) {
         MonthPickerDialog(
-            year = vm.homeYear, // ★ 使用 vm
-            month = vm.homeMonth, // ★ 使用 vm
+            year = vm.homeYear, // 使用 vm
+            month = vm.homeMonth, // 使用 vm
             showMonth = true,
             onDismiss = { showMonthPicker = false },
             onConfirm = { y, m ->
-                // ★ 修改：更新 vm 狀態
+                // 更新 vm 狀態
                 vm.homeYear = y
                 vm.homeMonth = m
                 showMonthPicker = false
@@ -108,7 +108,7 @@ fun HomeScreen(vm: TransactionViewModel, nav: NavHostController, onOpenDrawer: (
                     ) {
                         Icon(Icons.Default.DateRange, null, Modifier.size(18.dp), tint = TextGray)
                         Spacer(Modifier.width(8.dp))
-                        // ★ 修改：顯示 vm 的年份與月份
+
                         Text("${vm.homeYear}/${vm.homeMonth}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextGray)
                         Icon(Icons.Default.ArrowDropDown, null, tint = TextGray)
                     }

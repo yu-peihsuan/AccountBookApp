@@ -104,7 +104,7 @@ fun AddTransactionScreen(
         dateMillis = calendar.timeInMillis
     }
 
-    // ★ 定義支出類別列表 (已更新 Icon)
+    // 定義支出類別列表
     val expenseCategories = listOf(
         CategoryItem(strings.categoryBreakfast, Icons.Filled.FreeBreakfast, "breakfast"),
         CategoryItem(strings.categoryLunch, Icons.Filled.LunchDining, "lunch"),
@@ -120,7 +120,7 @@ fun AddTransactionScreen(
         CategoryItem(strings.categoryOther, Icons.Filled.MoreHoriz, "other")
     )
 
-    // ★ 定義收入類別列表 (已更新 Icon)
+    // 定義收入類別列表
     val incomeCategories = listOf(
         CategoryItem(strings.categorySalary, Icons.Filled.AttachMoney, "salary"),
         CategoryItem(strings.categoryBonus, Icons.Filled.EmojiEvents, "bonus"),
@@ -132,7 +132,7 @@ fun AddTransactionScreen(
 
     val customCategoryList = vm.customCategories.toList()
 
-    // ★ 根據目前的 type 切換顯示的列表
+    // 根據目前的 type 切換顯示的列表
     val displayCategories = remember(customCategoryList, strings, type) {
         // 使用 "Expense" 是為了相容性，但 UI 主要操作是 "支出"
         val baseList = if (type == "支出" || type == "Expense") expenseCategories else incomeCategories
@@ -211,7 +211,7 @@ fun AddTransactionScreen(
                 }
 
                 Box(Modifier.align(Alignment.Center)) {
-                    // ★ 切換 Type 時，預設選取列表的第一個項目
+
                     TypeSegmentedControl(type, strings) { newType ->
                         type = newType
                         // 切換時重置選擇，避免 Key 不存在
@@ -337,7 +337,7 @@ fun AddTransactionScreen(
                 handleAction = { finalAmount ->
                     val title = if (note.isNotEmpty()) note else ""
 
-                    // ★ 新增：更新首頁的年份與月份，使其跳轉到記帳日期的月份
+                    // 更新首頁的年份與月份，使其跳轉到記帳日期的月份
                     val c = Calendar.getInstance()
                     c.timeInMillis = dateMillis
                     vm.homeYear = c.get(Calendar.YEAR)
