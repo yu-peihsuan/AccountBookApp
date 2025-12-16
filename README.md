@@ -1,4 +1,4 @@
-# AccountBook App (記帳本)
+# 記帳APP
 
 本專案採用 MVVM 架構，UI 層使用 Jetpack Compose 實作，
 所有畫面狀態由 ViewModel 管理，並透過 SQLite 作為本地資料來源，
